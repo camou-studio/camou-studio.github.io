@@ -5236,6 +5236,55 @@ function camouSpriteFocusScale() {
   );
 }
 
+const camouGlobeFlightMaterials = new WeakMap();
+
+function camouSetGlobeFlightOpacity(value) {
+  const alpha = clamp(value, 0, 1);
+
+  globeGroup.traverse(object => {
+    if (!object.isMesh || !object.material) return;
+
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+
+    for (const material of materials) {
+      if (!camouGlobeFlightMaterials.has(material)) {
+        camouGlobeFlightMaterials.set(material, {
+          opacity: material.opacity,
+          transparent: material.transparent,
+          depthWrite: material.depthWrite
+        });
+      }
+
+      const original =
+        camouGlobeFlightMaterials.get(material);
+
+      const fading = alpha < 0.999;
+      const transparent = fading
+        ? true
+        : original.transparent;
+
+      const depthWrite = fading
+        ? false
+        : original.depthWrite;
+
+      if (
+        material.transparent !== transparent ||
+        material.depthWrite !== depthWrite
+      ) {
+        material.transparent = transparent;
+        material.depthWrite = depthWrite;
+        material.needsUpdate = true;
+      }
+
+      material.opacity = original.opacity * alpha;
+    }
+  });
+
+  sceneNeedsRender = true;
+}
+
 function camouSetPlanetSpriteForeground(enabled) {
   camouPlanet.material.depthTest = !enabled;
   camouPlanet.material.needsUpdate = true;
@@ -5306,7 +5355,16 @@ function camouFlyToWorld(
   pointers.clear();
   pointerStart = null;
 
+
   stage.classList.remove("dragging");
+
+  // Hauptkugel waehrend des gesamten
+  // Planetenwechsels im Szenengraphen behalten.
+  globeGroup.visible = true;
+
+  camouSetGlobeFlightOpacity(
+    world === "camou" ? 0 : 1
+  );
 
   if (world === "camou") {
     camouPlanet.position.set(0, 0, -25);
@@ -5398,7 +5456,14 @@ function camouUpdateWorldFlight(now) {
       )
     );
 
+
     if (f.to === "camou") {
+      // Die Hauptkugel erscheint bereits,
+      // waehrend der Projektplanet kleiner wird.
+      camouSetGlobeFlightOpacity(
+        smooth(t / 0.85)
+      );
+
       const scale = lerp(
         camouSpriteFocusScale(),
         CAMOU_SPRITE_TRAVEL_SCALE,
@@ -5415,10 +5480,26 @@ function camouUpdateWorldFlight(now) {
     if (elapsed >= CAMOU_ZOOM_OUT_MS) {
       setZoom(CAMOU_WORLD_OVERVIEW);
 
-      globeGroup.visible = false;
+
+      // CAMOU bleibt beim Wechsel in die
+      // Bewegungsphase weiterhin sichtbar.
+      if (f.to === "planet") {
+        camouSetPlanetSpriteForeground(true);
+      } else {
+        // Den gewaehlten CAMOU-Bereich ausrichten,
+        // solange die Kugel noch im Hintergrund ist.
+        const p = PLACES[f.index];
+
+        rotationX = p.lat * RAD;
+        rotationY = -p.lon * RAD;
+
+        camera.rotation.z =
+          CAMOU_PANEL_ROLL_DEG[f.index] * RAD;
+      }
 
       f.phase = "turn";
       f.start = now;
+
     }
 
     return;
@@ -5474,10 +5555,12 @@ function camouUpdateWorldFlight(now) {
       );
     }
 
-    // Beim Rueckflug den Planeten hinter CAMOU legen.
+
+    // CAMOU bleibt beim Hin- und Rueckflug sichtbar.
+    // Beim Rueckflug wandert der kleine Planet
+    // erst gegen Ende hinter die CAMOU-Kugel.
     if (f.to === "camou" && t >= 0.78) {
       camouSetPlanetSpriteForeground(false);
-      globeGroup.visible = true;
     }
 
     sceneNeedsRender = true;
@@ -5508,10 +5591,8 @@ function camouUpdateWorldFlight(now) {
         rotationY = 0;
       }
 
-      f.phase = "in";
-
-      f.phase = "in";
-      f.start = now;
+f.phase = "in";
+f.start = now;
     }
 
     return;
@@ -5536,8 +5617,16 @@ function camouUpdateWorldFlight(now) {
     );
 
     if (f.to === "planet") {
+      // Die CAMOU-Kugel bleibt waehrend der
+      // Bewegung sichtbar und verschwindet
+      // erst im letzten Teil des Heranzoomens.
+      camouSetGlobeFlightOpacity(
+        1 - smooth((t - 0.30) / 0.70)
+      );
+
       const scale = lerp(
         CAMOU_SPRITE_TRAVEL_SCALE,
+
         camouSpriteFocusScale(),
         t
       );
@@ -5579,7 +5668,17 @@ function camouUpdateWorldFlight(now) {
         camouRestorePlanetSprite();
         camouWorldFlight = null;
 
+
       } else if (camouSecondPlanetGroup) {
+        // Erst jetzt ist der Zoom abgeschlossen.
+        // Die inzwischen unsichtbare CAMOU-Kugel
+        // darf aus dem Rendering genommen werden.
+        globeGroup.visible = false;
+
+        // Urspruengliche Materialwerte fuer
+        // den spaeteren Rueckflug wiederherstellen.
+        camouSetGlobeFlightOpacity(1);
+
         // Zoom und Oberflaechenwechsel fertig.
         camouSecondPlanetGroup.visible = true;
 
@@ -5602,7 +5701,11 @@ function camouUpdateWorldFlight(now) {
         f.phase = "reveal";
         f.start = now;
 
+
       } else {
+        globeGroup.visible = false;
+        camouSetGlobeFlightOpacity(1);
+
         // Falls die 3D-Oberflaeche beim ersten
         // Besuch noch nicht vorbereitet ist.
         f.phase = "ready";
