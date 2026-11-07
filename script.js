@@ -5341,7 +5341,7 @@ function camouSpriteScaleForZoom(zoom) {
 
 const CAMOU_PLANET_TURN_MS = 720;
 const CAMOU_PLANET_SWAP_MS = 320;
-const CAMOU_PLANET_YAW = -0.68;
+const CAMOU_PLANET_YAW = -1.85;
 
 function camouFlyToWorld(world, sectionIndex = 0) {
   if (camouWorldFlight) return;
@@ -5446,9 +5446,10 @@ function camouUpdateWorldFlight(now) {
   const overview = CAMOU_WORLD_OVERVIEW;
   const focus = CAMOU_WORLD_FOCUS;
 
-  // Groesse des Sprites bei der
-  // Kamera-Gesamtansicht.
-  const matchScale =
+
+  // Kleine 3D-Kugel auf Sprite-Groesse bringen.
+  const miniScale =
+    CAMOU_SPRITE_TRAVEL_SCALE /
     camouSpriteScaleForZoom(overview);
 
   /* =====================================
@@ -5459,7 +5460,7 @@ function camouUpdateWorldFlight(now) {
     if (!f.ready) return;
 
     camouSecondPlanetGroup.visible = false;
-
+camouSecondPlanetGroup.scale.setScalar(miniScale);
     camouSecondPlanetPanel.visible = true;
     camouSecondPlanetPanel.material.opacity = 1;
 
@@ -5500,35 +5501,12 @@ function camouUpdateWorldFlight(now) {
     );
 
     if (u >= 1) {
-      next("match");
-    }
-  }
-
-  /* =====================================
-     HINFLUG 2: GROESSE ANGLEICHEN
-  ===================================== */
-
-  else if (f.phase === "match") {
-    const u = progress(CAMOU_PLANET_SWAP_MS);
-
-    const scale = lerp(
-      CAMOU_SPRITE_TRAVEL_SCALE,
-      matchScale,
-      u
-    );
-
-    camouPlanet.scale.set(
-      scale,
-      scale,
-      1
-    );
-
-    if (u >= 1) {
-      camouSecondPlanetGroup.visible = true;
-      next("swapIn");
-    }
-  }
-
+  camouSecondPlanetGroup.scale.setScalar(miniScale);
+  camouSecondPlanetGroup.visible = true;
+  next("swapIn");
+}
+}
+  
   /* =====================================
      HINFLUG 3: ZUR ECHTEN 3D-KUGEL
   ===================================== */
@@ -5576,17 +5554,19 @@ function camouUpdateWorldFlight(now) {
      HINFLUG 5: MIT INHALT HERANZOOMEN
   ===================================== */
 
-  else if (f.phase === "zoomIn") {
-    const u = progress(CAMOU_ZOOM_IN_MS);
+else if (f.phase === "zoomIn") {
+  const u = progress(CAMOU_ZOOM_IN_MS);
 
-    // Bild und Text sind schon auf der
-    // echten 3D-Oberflaeche vorhanden.
-    setZoom(
-      lerp(overview, focus, u)
-    );
+  // Die 3D-Kugel mitsamt Inhalt wird groesser.
+  camouSecondPlanetGroup.scale.setScalar(
+    lerp(miniScale, 1, u)
+  );
 
-    if (elapsed >= CAMOU_ZOOM_IN_MS) {
-      setZoom(focus);
+  setZoom(lerp(overview, focus, u));
+
+  if (elapsed >= CAMOU_ZOOM_IN_MS) {
+    camouSecondPlanetGroup.scale.setScalar(1);
+    setZoom(focus);
 
       // Kamera- und Planetenausrichtung
       // gemeinsam zuruecksetzen.
@@ -5614,20 +5594,26 @@ function camouUpdateWorldFlight(now) {
      RUECKFLUG 1: MIT INHALT VERKLEINERN
   ===================================== */
 
-  else if (f.phase === "returnZoom") {
-    const u = progress(CAMOU_ZOOM_IN_MS);
 
-    // Die 3D-Kugel wird kleiner.
-    // Bild und Text bleiben darauf.
-    setZoom(
-      lerp(f.fromZoom, overview, u)
+else if (f.phase === "returnZoom") {
+  const u = progress(CAMOU_ZOOM_IN_MS);
+
+  // Ganze 3D-Kugel mit Bild und Text verkleinern.
+  camouSecondPlanetGroup.scale.setScalar(
+    lerp(1, miniScale, u)
+  );
+
+  setZoom(lerp(f.fromZoom, overview, u));
+
+  if (elapsed >= CAMOU_ZOOM_IN_MS) {
+    camouSecondPlanetGroup.scale.setScalar(
+      miniScale
     );
 
-    if (elapsed >= CAMOU_ZOOM_IN_MS) {
-      setZoom(overview);
-      next("returnTurn");
-    }
+    setZoom(overview);
+    next("returnTurn");
   }
+}
 
   /* =====================================
      RUECKFLUG 2: PROJEKTBEREICH WEGDREHEN
@@ -5653,12 +5639,11 @@ function camouUpdateWorldFlight(now) {
         0, 0, -25
       );
 
-      camouPlanet.scale.set(
-        matchScale,
-        matchScale,
-        1
-      );
-
+camouPlanet.scale.set(
+  CAMOU_SPRITE_TRAVEL_SCALE,
+  CAMOU_SPRITE_TRAVEL_SCALE,
+  1
+);
       camouPlanet.material.opacity = 0;
       camouPlanet.visible = true;
 
@@ -5697,31 +5682,7 @@ function camouUpdateWorldFlight(now) {
       globeGroup.visible = true;
       camouSetGlobeFlightOpacity(1);
 
-      next("returnShrink");
-    }
-  }
-
-  /* =====================================
-     RUECKFLUG 4: KLEINEN PLANETEN ANPASSEN
-  ===================================== */
-
-  else if (f.phase === "returnShrink") {
-    const u = progress(CAMOU_PLANET_SWAP_MS);
-
-    const scale = lerp(
-      matchScale,
-      CAMOU_SPRITE_TRAVEL_SCALE,
-      u
-    );
-
-    camouPlanet.scale.set(
-      scale,
-      scale,
-      1
-    );
-
-    if (elapsed >= CAMOU_PLANET_SWAP_MS) {
-      next("returnMove");
+ next("returnMove");
     }
   }
 
