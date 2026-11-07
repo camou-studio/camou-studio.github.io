@@ -3654,8 +3654,9 @@ const camouProjectYawAxis =
 const camouProjectYawQuat =
   new THREE.Quaternion();
 
-// Freie Erkundung des Projektplaneten.
-let camouExploreY = 0;
+  // Freie Erkundung des Projektplaneten.
+  let camouExploreX = 0;
+  let camouExploreY = 0;
 
 const camouExploreEuler =
   new THREE.Euler(0, 0, 0, "XYZ");
