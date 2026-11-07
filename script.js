@@ -2101,14 +2101,47 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ctx.restore();
 }
 
+
+let camouVisualSlideLoading = null;
+
+function camouEnsureVisualSlides() {
+  if (camouVisualSlideLoading) {
+    return camouVisualSlideLoading;
+  }
+
+  camouVisualSlideLoading = Promise.all(
+    ASSETS.visualSlides.slice(1).map(loadImage)
+  ).then(images => {
+    images.forEach((image, i) => {
+      visualImages[i + 1] = image;
+    });
+
+    refreshVisualsTexture();
+  });
+
+  return camouVisualSlideLoading;
+}
+
 function advanceVisualSlide() {
   if (!visualImages.length) return;
+
+  if (visualImages.some(image => !image)) {
+    camouEnsureVisualSlides().then(() => {
+      visualIndex =
+        (visualIndex + 1) % visualImages.length;
+
+      refreshVisualsTexture();
+    });
+
+    return;
+  }
 
   visualIndex =
     (visualIndex + 1) % visualImages.length;
 
   refreshVisualsTexture();
 }
+
 
 function refreshVisualsTexture() {
   refreshIsland(2);
@@ -2480,9 +2513,47 @@ async function createGlobeTexture() {
     ASSETS.contact
   ].map(loadImage));
 
-  visualImages = await Promise.all(
-    ASSETS.visualSlides.map(loadImage)
-  );
+
+let camouVisualSlideLoading = null;
+
+function camouEnsureVisualSlides() {
+  if (camouVisualSlideLoading) {
+    return camouVisualSlideLoading;
+  }
+
+  camouVisualSlideLoading = Promise.all(
+    ASSETS.visualSlides.slice(1).map(loadImage)
+  ).then(images => {
+    images.forEach((image, i) => {
+      visualImages[i + 1] = image;
+    });
+
+    refreshVisualsTexture();
+  });
+
+  return camouVisualSlideLoading;
+}
+
+function advanceVisualSlide() {
+  if (!visualImages.length) return;
+
+  if (visualImages.some(image => !image)) {
+    camouEnsureVisualSlides().then(() => {
+      visualIndex =
+        (visualIndex + 1) % visualImages.length;
+
+      refreshVisualsTexture();
+    });
+
+    return;
+  }
+
+  visualIndex =
+    (visualIndex + 1) % visualImages.length;
+
+  refreshVisualsTexture();
+}
+
 
   visualIndex = 0;
   await canvasFontsReady;
@@ -3569,6 +3640,8 @@ let lastShownSensorMode = "";
 function animate(now = 0) {
   requestAnimationFrame(animate);
 
+  if (camouWorldFlight) camouUpdateWorldFlight(now);
+
   /* NAVIGATION – DREI PHASEN */
 
   if (!isDragging && menuAnimating) {
@@ -3686,6 +3759,14 @@ function animate(now = 0) {
     rotationY,
     0
   );
+
+  if (camouSecondPlanetGroup) {
+    camouSecondPlanetGroup.rotation.set(
+      rotationX,
+      rotationY,
+      0
+    );
+  }
 
   // Video nur bei neuen Frames.
   if (
@@ -4672,4 +4753,624 @@ inImage = function(point, index) {
     Math.abs(q.x) <= CAMOU_CONTACT_W / 2 &&
     Math.abs(q.y) <= CAMOU_CONTACT_H / 2;
 };
+
+/* ============================================================
+   CAMOU PROJEKTPLANET 02
+   ERST BEIM AUFRUF LADEN
+============================================================ */
+
+let camouSecondPlanetGroup = null;
+let camouSecondPlanetReady = null;
+let camouWorldMode = "camou";
+let camouWorldFlight = null;
+let camouSpriteHome = null;
+
+const CAMOU_WORLD_OVERVIEW = CAMOU_OVERVIEW_ZOOM;
+const CAMOU_WORLD_FOCUS = CAMOU_FOCUS_ZOOM;
+const CAMOU_SPRITE_TRAVEL_SCALE = 9.0;
+
+// Freier Bereich auf der CAMOU-Kugel.
+const camouPortalPlace = {
+  lon: 63,
+  lat: -4,
+  tiltR: -7 * RAD
+};
+
+/* =========================================
+   SCHAU REIN AUF DER CAMOU-KUGEL
+========================================= */
+
+function camouCreatePortal() {
+  if (CAMOU_V2_MESHES[5]) return;
+
+  const canvas = document.createElement("canvas");
+
+  // Halbe Aufloesung spart Speicher beim Start.
+  canvas.width = CAMOU_V2_W / 2;
+  canvas.height = CAMOU_V2_H / 2;
+
+  const c = canvas.getContext("2d");
+
+  c.scale(0.5, 0.5);
+  c.translate(
+    CAMOU_V2_W / 2,
+    CAMOU_V2_H / 2
+  );
+
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.font = "500 28px 'DM Mono', monospace";
+
+  c.shadowColor = "rgba(0,0,0,.7)";
+  c.shadowBlur = 14;
+  c.fillStyle = "#e6ede5";
+
+  c.fillText("SCHAU REIN  ↗", 0, 0);
+
+  c.shadowBlur = 0;
+
+  c.strokeStyle = "rgba(213,238,216,.38)";
+  c.lineWidth = 1;
+
+  c.beginPath();
+  c.moveTo(-118, 27);
+  c.lineTo(118, 27);
+  c.stroke();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const mesh = new THREE.Mesh(
+    camouV2Geometry(camouPortalPlace),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    })
+  );
+
+  mesh.renderOrder = 2;
+  mesh.userData.sectionIndex = 5;
+
+  globeGroup.add(mesh);
+  CAMOU_V2_MESHES[5] = mesh;
+
+  sceneNeedsRender = true;
+}
+
+/* =========================================
+   GESTEINSOBERFLAECHE DER ZWEITEN KUGEL
+========================================= */
+
+function camouCreateRockyWorldTexture() {
+  const w = 512;
+  const h = 256;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+
+  const c = canvas.getContext("2d");
+  const data = c.createImageData(w, h);
+
+  for (let y = 0; y < h; y++) {
+    const v = y / h;
+
+    for (let x = 0; x < w; x++) {
+      const u = x / w;
+
+      const n =
+        0.50 * Math.sin(
+          u * Math.PI * 8 +
+          Math.sin(v * 13) * 3.7
+        ) +
+        0.30 * Math.cos(
+          u * Math.PI * 14 - v * 29
+        ) +
+        0.20 * Math.sin(
+          u * Math.PI * 28 +
+          Math.cos(v * 34)
+        );
+
+      const mark = 0.5 + 0.5 * n;
+      const i = (y * w + x) * 4;
+
+      data.data[i] = 82 + 35 * mark;
+      data.data[i + 1] = 82 + 32 * mark;
+      data.data[i + 2] = 111 + 40 * mark;
+      data.data[i + 3] = 255;
+    }
+  }
+
+  c.putImageData(data, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+
+  return texture;
+}
+
+/* =========================================
+   INHALT DES ZWEITEN PROJEKTS
+========================================= */
+
+function camouDrawSecondProject(ctx, image) {
+  ctx.clearRect(
+    0, 0, CAMOU_V2_W, CAMOU_V2_H
+  );
+
+  ctx.save();
+
+  ctx.translate(
+    CAMOU_V2_W / 2,
+    CAMOU_V2_H / 2
+  );
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#f3eee9";
+
+  ctx.font = "500 16px 'DM Mono', monospace";
+  ctx.fillText(
+    "PROJEKT 02  /  IN ENTSTEHUNG",
+    0, -310
+  );
+
+  ctx.font = "300 58px Manrope, Arial";
+  ctx.fillText(
+    "Eine neue Welt",
+    0, -233
+  );
+
+  ctx.font = "400 21px Manrope, Arial";
+  ctx.fillText(
+    "Ein neuer Ort fuer Musik, Bilder und Geschichten.",
+    0, -185
+  );
+
+  const px = -230;
+  const py = -132;
+  const pw = 460;
+  const ph = 278;
+
+  ctx.fillStyle = "rgba(8,12,18,.75)";
+
+  ctx.fillRect(
+    px - 7,
+    py - 7,
+    pw + 14,
+    ph + 14
+  );
+
+  if (image) {
+    cover(ctx, image, px, py, pw, ph);
+  }
+
+  ctx.strokeStyle = "rgba(216,211,230,.75)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(px, py, pw, ph);
+
+  ctx.font = "400 20px Manrope, Arial";
+  ctx.fillStyle = "#e1dce8";
+
+  ctx.fillText(
+    "Hier entsteht das naechste Projekt von b3nn3t.",
+    0, 206
+  );
+
+  ctx.font = "400 15px 'DM Mono', monospace";
+  ctx.fillStyle = "rgba(220,216,236,.78)";
+
+  ctx.fillText(
+    "ZURUECK: NAVIGATION ODER BUTTON",
+    0, 265
+  );
+
+  ctx.restore();
+}
+
+// Dieses Bild wird erst beim Besuch angefordert.
+function camouLoadSecondProjectImage() {
+  const url = new URL(
+    "./assets/planet-project.jpg",
+    import.meta.url
+  ).href;
+
+  return loadImage(url);
+}
+
+/* =========================================
+   ZWEITEN PLANETEN BEI BEDARF ERSTELLEN
+========================================= */
+
+function camouEnsureSecondPlanet() {
+  if (camouSecondPlanetReady) {
+    return camouSecondPlanetReady;
+  }
+
+  camouSecondPlanetReady = (async () => {
+    const group = new THREE.Group();
+
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(
+        CONFIG.radius, 96, 64
+      ),
+      new THREE.MeshStandardMaterial({
+        map: camouCreateRockyWorldTexture(),
+        roughness: 0.96,
+        metalness: 0
+      })
+    );
+
+    group.add(sphere);
+
+    const canvas = document.createElement("canvas");
+
+    canvas.width = CAMOU_V2_W;
+    canvas.height = CAMOU_V2_H;
+
+    const panelTexture =
+      new THREE.CanvasTexture(canvas);
+
+    panelTexture.colorSpace =
+      THREE.SRGBColorSpace;
+
+    const panel = new THREE.Mesh(
+      camouV2Geometry({
+        lon: 0,
+        lat: 0,
+        tiltR: 0
+      }),
+      new THREE.MeshBasicMaterial({
+        map: panelTexture,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      })
+    );
+
+    panel.renderOrder = 2;
+    group.add(panel);
+
+    // Bereich sofort anzeigen, Bild folgt spaeter.
+    camouDrawSecondProject(
+      canvas.getContext("2d"),
+      null
+    );
+
+    panelTexture.needsUpdate = true;
+
+    group.visible = false;
+    scene.add(group);
+
+    camouSecondPlanetGroup = group;
+
+    // Das Bild wird erst jetzt geladen.
+    const image =
+      await camouLoadSecondProjectImage();
+
+    camouDrawSecondProject(
+      canvas.getContext("2d"),
+      image
+    );
+
+    panelTexture.needsUpdate = true;
+    sceneNeedsRender = true;
+
+    return group;
+  })();
+
+  return camouSecondPlanetReady;
+}
+
+/* =========================================
+   ZURUECK-BUTTON
+========================================= */
+
+const camouReturnButton =
+  document.createElement("button");
+
+camouReturnButton.type = "button";
+camouReturnButton.textContent =
+  "← ZURUECK ZU CAMOU";
+
+camouReturnButton.setAttribute(
+  "aria-label",
+  "Zurueck zur CAMOU-Kugel"
+);
+
+Object.assign(camouReturnButton.style, {
+  position: "absolute",
+  bottom: "30px",
+  left: "24px",
+  zIndex: "12",
+  padding: "12px 17px",
+  cursor: "pointer",
+  border: "1px solid rgba(229,230,235,.5)",
+  background: "rgba(7,12,20,.78)",
+  color: "#f3f0f3",
+  font: "500 12px monospace",
+  letterSpacing: "1px",
+  display: "none",
+  borderRadius: "3px"
+});
+
+stage.appendChild(camouReturnButton);
+
+camouReturnButton.addEventListener(
+  "pointerdown",
+  event => event.stopPropagation()
+);
+
+camouReturnButton.addEventListener(
+  "click",
+  () => camouFlyToWorld("camou", 0)
+);
+
+/* =========================================
+   NAVIGATIONSFLUG ZWISCHEN DEN PLANETEN
+========================================= */
+
+function camouFlyToWorld(
+  world,
+  sectionIndex = 0
+) {
+  if (camouWorldFlight) return;
+
+  if (world === "planet") {
+    camouSpriteHome = {
+      position: camouPlanet.position.clone(),
+      scale: camouPlanet.scale.clone()
+    };
+
+    // Erst jetzt den zweiten Planeten erzeugen.
+    void camouEnsureSecondPlanet();
+  }
+
+  velocityX = 0;
+  velocityY = 0;
+  isDragging = false;
+  menuAnimating = false;
+  camouNavPhase = "idle";
+  pointers.clear();
+
+  camouWorldFlight = {
+    to: world,
+    index: sectionIndex,
+    phase: "out",
+    start: performance.now(),
+    fromZoom: currentZoom
+  };
+
+  sceneNeedsRender = true;
+}
+
+function camouUpdateWorldFlight(now) {
+  const f = camouWorldFlight;
+  if (!f) return;
+
+  const elapsed = Math.max(
+    0,
+    now - f.start
+  );
+
+  // PHASE 1: HERAUSZOOMEN
+  if (f.phase === "out") {
+    setZoom(
+      lerp(
+        f.fromZoom,
+        CAMOU_WORLD_OVERVIEW,
+        smooth(elapsed / CAMOU_ZOOM_OUT_MS)
+      )
+    );
+
+    if (elapsed >= CAMOU_ZOOM_OUT_MS) {
+      setZoom(CAMOU_WORLD_OVERVIEW);
+
+      f.phase = "turn";
+      f.start = now;
+
+      if (f.to === "planet") {
+        globeGroup.visible = false;
+      } else {
+        camouSecondPlanetGroup.visible = false;
+        camouPlanet.visible = true;
+
+        camouPlanet.position.set(0, 0, -25);
+
+        camouPlanet.scale.set(
+          CAMOU_SPRITE_TRAVEL_SCALE,
+          CAMOU_SPRITE_TRAVEL_SCALE,
+          1
+        );
+      }
+    }
+
+  // PHASE 2: ZUM ANDEREN PLANETEN
+  } else if (f.phase === "turn") {
+    const t = smooth(
+      elapsed / CAMOU_ROTATE_MS
+    );
+
+    const home = camouSpriteHome;
+
+    if (home) {
+      const from = f.to === "planet"
+        ? home.position
+        : new THREE.Vector3(0, 0, -25);
+
+      const to = f.to === "planet"
+        ? new THREE.Vector3(0, 0, -25)
+        : home.position;
+
+      camouPlanet.position
+        .copy(from)
+        .lerp(to, t);
+
+      const fromS = f.to === "planet"
+        ? home.scale.x
+        : CAMOU_SPRITE_TRAVEL_SCALE;
+
+      const toS = f.to === "planet"
+        ? CAMOU_SPRITE_TRAVEL_SCALE
+        : home.scale.x;
+
+      const scale = lerp(fromS, toS, t);
+
+      camouPlanet.scale.set(
+        scale, scale, 1
+      );
+    }
+
+    if (
+      f.to === "camou" &&
+      t > 0.45
+    ) {
+      globeGroup.visible = true;
+    }
+
+    sceneNeedsRender = true;
+
+    if (elapsed < CAMOU_ROTATE_MS) return;
+
+    if (f.to === "planet") {
+      if (
+        !camouSecondPlanetGroup ||
+        !camouSecondPlanetReady
+      ) return;
+
+      globeGroup.visible = false;
+      camouSecondPlanetGroup.visible = true;
+      camouPlanet.visible = false;
+
+      rotationX = 0;
+      rotationY = 0;
+      camera.rotation.z = 0;
+
+      camouWorldMode = "planet";
+
+      camouReturnButton.style.display =
+        "block";
+
+      navButtons.forEach(button => {
+        button.classList.remove("active");
+      });
+
+      if ($("current-section")) {
+        $("current-section").textContent =
+          "PROJEKT 02";
+      }
+
+      if ($("section-number")) {
+        $("section-number").textContent =
+          "02 / 02";
+      }
+
+    } else {
+      camouSecondPlanetGroup.visible = false;
+      globeGroup.visible = true;
+      camouPlanet.visible = true;
+
+      camouWorldMode = "camou";
+
+      camouReturnButton.style.display =
+        "none";
+
+      const p = PLACES[f.index];
+
+      rotationX = p.lat * RAD;
+      rotationY = -p.lon * RAD;
+
+      camera.rotation.z =
+        CAMOU_PANEL_ROLL_DEG[f.index] * RAD;
+
+      lastIndicatorIndex = -1;
+      updateIndicator();
+    }
+
+    f.phase = "in";
+    f.start = now;
+
+    sceneNeedsRender = true;
+
+  // PHASE 3: HINEINZOOMEN
+  } else if (f.phase === "in") {
+    setZoom(
+      lerp(
+        CAMOU_WORLD_OVERVIEW,
+        CAMOU_WORLD_FOCUS,
+        smooth(elapsed / CAMOU_ZOOM_IN_MS)
+      )
+    );
+
+    if (elapsed >= CAMOU_ZOOM_IN_MS) {
+      setZoom(CAMOU_WORLD_FOCUS);
+      camouWorldFlight = null;
+    }
+  }
+}
+
+/* =========================================
+   BESTEHENDE NAVIGATION ANBINDEN
+========================================= */
+
+const camouOriginalGoToSection = goToSection;
+
+goToSection = function(index) {
+  // VISUALS-Bilder erst bei Aufruf laden.
+  if (index === 2) {
+    void camouEnsureVisualSlides();
+  }
+
+  // Vom zweiten Planeten zu CAMOU zurueck.
+  if (camouWorldMode === "planet") {
+    camouFlyToWorld(
+      "camou",
+      ((index % 5) + 5) % 5
+    );
+    return;
+  }
+
+  if (camouWorldFlight) return;
+
+  camouOriginalGoToSection(index);
+};
+
+const camouOriginalIndicator = updateIndicator;
+
+updateIndicator = function() {
+  if (camouWorldMode === "planet") return;
+  camouOriginalIndicator();
+};
+
+/* =========================================
+   KLICK AUF SCHAU REIN
+========================================= */
+
+const camouOriginalGlobeClick =
+  handleGlobeClick;
+
+handleGlobeClick = function(event) {
+  if (camouWorldMode === "planet") return;
+
+  const point = texturePoint(event);
+
+  if (
+    point?.index === 5 &&
+    Math.abs(point.x) < 210 &&
+    Math.abs(point.y) < 90
+  ) {
+    camouFlyToWorld("planet");
+    return;
+  }
+
+  camouOriginalGlobeClick(event);
+};
+
+// Portal auf der Hauptkugel erzeugen.
+camouCreatePortal();
+
+/* ENDE CAMOU PROJEKTPLANET 02 */
 
