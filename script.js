@@ -3268,7 +3268,10 @@ stage.addEventListener(
     const point = texturePoint(event);
 
     // Visuals Hebel.
-    if (isOnVisualLever(point)) {
+    if (
+  camouWorldMode !== "planet" &&
+  isOnVisualLever(point)
+) {
       visualLeverPointer = event.pointerId;
       visualLeverMoved = false;
       visualLeverStartY = event.clientY;
@@ -3446,9 +3449,16 @@ const sensitivity = CONFIG.dragSpeed * 0.80;
 const mx = horizontal * sensitivity;
 const my = vertical * sensitivity;
 
-// Kugel bewegen
-rotationY += mx;
-rotationX += my;
+
+// Die jeweils aktive Welt drehen.
+if (camouWorldMode === "planet") {
+  camouExploreY += mx;
+  camouExploreX += my;
+  sceneNeedsRender = true;
+} else {
+  rotationY += mx;
+  rotationX += my;
+}
 
 // Trägheit übernehmen
 velocityY = mx / factor;
@@ -3566,21 +3576,54 @@ window.addEventListener(
       )
     ) return;
 
-    if (event.key === "ArrowRight") {
-      goToSection(currentIndex() + 1);
-    }
+    
+if (camouWorldFlight) return;
 
-    if (event.key === "ArrowLeft") {
-      goToSection(currentIndex() - 1);
-    }
+if (event.key === "ArrowRight") {
+  event.preventDefault();
 
-    if (event.key === "ArrowUp") {
-      rotationX -= 0.25;
-    }
+  if (camouWorldMode === "planet") {
+    camouExploreY += 0.25;
+    sceneNeedsRender = true;
+  } else {
+    goToSection(currentIndex() + 1);
+  }
+}
 
-    if (event.key === "ArrowDown") {
-      rotationX += 0.25;
-    }
+if (event.key === "ArrowLeft") {
+  event.preventDefault();
+
+  if (camouWorldMode === "planet") {
+    camouExploreY -= 0.25;
+    sceneNeedsRender = true;
+  } else {
+    goToSection(currentIndex() - 1);
+  }
+}
+
+if (event.key === "ArrowUp") {
+  event.preventDefault();
+
+  if (camouWorldMode === "planet") {
+    camouExploreX -= 0.25;
+  } else {
+    rotationX -= 0.25;
+  }
+
+  sceneNeedsRender = true;
+}
+
+if (event.key === "ArrowDown") {
+  event.preventDefault();
+
+  if (camouWorldMode === "planet") {
+    camouExploreX += 0.25;
+  } else {
+    rotationX += 0.25;
+  }
+
+  sceneNeedsRender = true;
+}
 
     if (
       event.key === "+" ||
@@ -3610,6 +3653,27 @@ const camouProjectYawAxis =
 
 const camouProjectYawQuat =
   new THREE.Quaternion();
+
+// Freie Erkundung des Projektplaneten.
+let camouExploreY = 0;
+
+const camouExploreEuler =
+  new THREE.Euler(0, 0, 0, "XYZ");
+
+const camouExploreQuaternion =
+  new THREE.Quaternion();
+
+function camouGetExploreQuaternion() {
+  camouExploreEuler.set(
+    camouExploreX,
+    camouExploreY,
+    0
+  );
+
+  return camouExploreQuaternion
+    .setFromEuler(camouExploreEuler);
+}
+
 
 function animate(now = 0) {
   requestAnimationFrame(animate);
@@ -3711,14 +3775,25 @@ function animate(now = 0) {
       }
     }
 
-   } else if (!isDragging && !camouWorldFlight) {
+  
+} else if (!isDragging && !camouWorldFlight) {
 
+  if (camouWorldMode === "planet") {
+    camouExploreY += velocityY;
+    camouExploreX += velocityX;
+
+    if (velocityX !== 0 || velocityY !== 0) {
+      sceneNeedsRender = true;
+    }
+
+  } else {
     rotationY += velocityY;
     rotationX += velocityX;
+  }
 
-    velocityY *= CONFIG.friction;
-    velocityX *= CONFIG.friction;
-
+  // Bestehende Reibungsberechnung folgt.
+velocityY *= CONFIG.friction;
+velocityX *= CONFIG.friction;
     if (Math.abs(velocityY) < 0.00004) {
       velocityY = 0;
     }
@@ -3734,21 +3809,41 @@ function animate(now = 0) {
     0
   );
 
+
 if (camouSecondPlanetGroup) {
   const f = camouWorldFlight;
 
   if (f || camouWorldMode === "planet") {
-    camouProjectYawQuat.setFromAxisAngle(
-      camouProjectYawAxis,
-      f?.planetYaw ?? 0
-    );
+
+    if (f?.planetOrientation) {
+      // Die beim Rueckflug gespeicherte
+      // Erkundungsrichtung verwenden.
+      camouProjectYawQuat.copy(
+        f.planetOrientation
+      );
+
+    } else if (f) {
+      // Automatische Drehung beim Hinflug.
+      camouProjectYawQuat.setFromAxisAngle(
+        camouProjectYawAxis,
+        f.planetYaw ?? 0
+      );
+
+    } else {
+      // Freies Drehen nach dem Hinflug.
+      camouProjectYawQuat.copy(
+        camouGetExploreQuaternion()
+      );
+    }
 
     camouSecondPlanetGroup.quaternion
       .copy(camera.quaternion)
       .multiply(camouProjectYawQuat);
 
   } else {
-    camouSecondPlanetGroup.rotation.set(0, 0, 0);
+    camouSecondPlanetGroup.rotation.set(
+      0, 0, 0
+    );
   }
 }
 
@@ -5431,18 +5526,31 @@ function camouFlyToWorld(world, sectionIndex = 0) {
         }
       });
 
-  } else {
-    // Rueckflug beginnt mit der grossen
-    // 3D-Kugel und ihrem sichtbaren Inhalt.
-    camouWorldFlight = {
-      to: "camou",
-      index: sectionIndex,
-      phase: "returnZoom",
-      start: performance.now(),
-      fromZoom: currentZoom,
-      planetYaw: 0
-    };
+  
+} else {
+  // Die zuletzt erkundete Ausrichtung sichern.
+  const exploredOrientation =
+    camouGetExploreQuaternion().clone();
 
+  camouWorldFlight = {
+    to: "camou",
+    index: sectionIndex,
+    phase: "returnZoom",
+    start: performance.now(),
+    fromZoom: currentZoom,
+
+    planetOrientation:
+      exploredOrientation.clone(),
+
+    returnFromOrientation:
+      exploredOrientation,
+
+    returnToOrientation:
+      new THREE.Quaternion().setFromAxisAngle(
+        camouProjectYawAxis,
+        CAMOU_PLANET_YAW
+      )
+  };
     
 // CAMOU steht bereits beim Beginn des
 // Rueckflugs hinter dem Projektplaneten.
@@ -5641,9 +5749,12 @@ else if (f.phase === "zoomIn") {
         0, 0, 0
       );
 
-      camouWorldMode = "planet";
-      camouSetSecondProjectInfo();
+camouExploreX = 0;
+camouExploreY = 0;
 
+camouWorldMode = "planet";
+camouSetSecondProjectInfo();
+     
       // Material fuer den spaeteren
       // Rueckflug wiederherstellen.
       camouSetGlobeFlightOpacity(1);
@@ -5700,14 +5811,17 @@ else if (f.phase === "returnZoom") {
 
     // Der Inhaltsbereich verschwindet
     // durch die Rotation der 3D-Kugel.
-    f.planetYaw = lerp(
-      0,
-      CAMOU_PLANET_YAW,
-      u
-    );
 
-    if (elapsed >= CAMOU_PLANET_TURN_MS) {
-      f.planetYaw = CAMOU_PLANET_YAW;
+// Von der zuletzt erkundeten Ausrichtung
+// sanft zur Rueckflugposition drehen.
+f.planetOrientation
+  .copy(f.returnFromOrientation)
+  .slerp(f.returnToOrientation, u);
+
+if (elapsed >= CAMOU_PLANET_TURN_MS) {
+  f.planetOrientation.copy(
+    f.returnToOrientation
+  );
 
       // Kleine Planetenansicht
       // passend zur 3D-Kugel vorbereiten.
