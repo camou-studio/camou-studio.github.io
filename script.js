@@ -5425,7 +5425,8 @@ camouWorldFlight = {
     ? camouSecondPlanetGroup.rotation.clone()
     : new THREE.Euler()
 };
-
+// Ende von camouFlyToWorld()
+}
 function camouUpdateReturnFlight(now) {
   const f = camouWorldFlight;
   if (!f || f.to !== "camou") return;
