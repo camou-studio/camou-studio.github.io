@@ -5426,15 +5426,27 @@ function camouUpdateWorldFlight(now) {
 
     sceneNeedsRender = true;
 
-    if (
-      elapsed >= CAMOU_WORLD_CROSSFADE_MS
-    ) {
-      camouSecondPlanetGroup.visible = false;
+if (
+  elapsed >= CAMOU_WORLD_CROSSFADE_MS
+) {
+  // Die grosse 3D-Ansicht ausblenden.
+  camouSecondPlanetGroup.visible = false;
 
-      f.phase = "out";
-      f.start = now;
-      f.fromZoom = currentZoom;
-    }
+  // Jetzt den kleinen Planeten hinter CAMOU legen.
+  // CAMOU ist zu diesem Zeitpunkt noch transparent.
+  // Deshalb entsteht kein sichtbarer Ebenenwechsel.
+  camouSetPlanetSpriteForeground(false);
+
+  // Den kleinen Planeten vollständig anzeigen.
+  camouPlanet.material.opacity = 1;
+
+  // Rueckflug starten.
+  f.phase = "out";
+  f.start = now;
+  f.fromZoom = currentZoom;
+
+  sceneNeedsRender = true;
+}
 
     return;
   }
@@ -5553,14 +5565,6 @@ function camouUpdateWorldFlight(now) {
         scale,
         1
       );
-    }
-
-
-    // CAMOU bleibt beim Hin- und Rueckflug sichtbar.
-    // Beim Rueckflug wandert der kleine Planet
-    // erst gegen Ende hinter die CAMOU-Kugel.
-    if (f.to === "camou" && t >= 0.78) {
-      camouSetPlanetSpriteForeground(false);
     }
 
     sceneNeedsRender = true;
