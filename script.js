@@ -5107,15 +5107,17 @@ const sphere = new THREE.Mesh(
   ),
   new THREE.MeshBasicMaterial({
     map: camouCreateRockyWorldTexture(),
-    transparent: true,
-    opacity: 1,
-    depthTest: false,
+
+    // Echte, undurchsichtige 3D-Oberflaeche.
+    transparent: false,
+    depthTest: true,
     depthWrite: true
   })
 );
 
-// Projektplanet nach der CAMOU-Kugel zeichnen.
-sphere.renderOrder = 10;
+// Die Tiefenpruefung bestimmt, welche
+// Kugeloberflaeche vorne liegt.
+sphere.renderOrder = 0;
 
 group.add(sphere);
 
@@ -5132,17 +5134,23 @@ group.add(sphere);
           lat: 0,
           tiltR: 0
         }),
-        new THREE.MeshBasicMaterial({
-          map: texture,
-          transparent: true,
-          opacity: 0,
-          depthWrite: false,
-          side: THREE.DoubleSide
-        })
-      );
+       
+new THREE.MeshBasicMaterial({
+  map: texture,
+  transparent: true,
+  opacity: 0,
 
-      panel.renderOrder = 11;
-      panel.visible = false;
+  // Die Kugel verdeckt den Inhalt
+  // auf ihrer Rueckseite.
+  depthTest: true,
+  depthWrite: false,
+  side: THREE.DoubleSide
+})
+);
+
+panel.renderOrder = 2;
+panel.visible = false;
+
       group.add(panel);
 
       camouDrawSecondProject(
