@@ -3847,7 +3847,9 @@ if (camouSecondPlanetGroup) {
     );
   }
 }
-
+// Auch bei manueller Bedienung den
+// Projektplaneten samt Inhalt skalieren.
+camouUpdateExplorePlanetSize();
   // Video nur bei neuen Frames.
   if (
     homeVideoPlaying &&
@@ -5476,6 +5478,59 @@ const CAMOU_MINI_FRONT_Z =
 
 const CAMOU_FULL_FRONT_Z = 0.12;
 
+function camouMiniProjectScale() {
+  const spriteSlope =
+    CAMOU_SPRITE_TRAVEL_SCALE *
+    CAMOU_PLANET_SPRITE_RADIUS / 50;
+
+  return (
+    (CAMOU_WORLD_OVERVIEW - CAMOU_MINI_FRONT_Z) *
+    spriteSlope /
+    (
+      CONFIG.radius *
+      Math.sqrt(1 + spriteSlope ** 2)
+    )
+  );
+}
+
+// Manueller Zoom mit derselben Bewegung
+// wie beim animierten Hin- und Rueckflug.
+function camouUpdateExplorePlanetSize() {
+  if (
+    camouWorldMode !== "planet" ||
+    camouWorldFlight ||
+    !camouSecondPlanetGroup
+  ) return;
+
+  const u = clamp(
+    (currentZoom - CAMOU_WORLD_FOCUS) /
+    (CAMOU_WORLD_OVERVIEW - CAMOU_WORLD_FOCUS),
+    0,
+    1
+  );
+
+  const z = lerp(
+    CAMOU_FULL_FRONT_Z,
+    CAMOU_MINI_FRONT_Z,
+    u
+  );
+
+  const scale = lerp(
+    1,
+    camouMiniProjectScale(),
+    u
+  );
+
+  if (
+    Math.abs(camouSecondPlanetGroup.position.z - z) > 1e-7 ||
+    Math.abs(camouSecondPlanetGroup.scale.x - scale) > 1e-7
+  ) {
+    camouSecondPlanetGroup.position.z = z;
+    camouSecondPlanetGroup.scale.setScalar(scale);
+    sceneNeedsRender = true;
+  }
+}
+
 function camouFlyToWorld(world, sectionIndex = 0) {
   if (camouWorldFlight) return;
   if (world === camouWorldMode) return;
@@ -5548,7 +5603,11 @@ function camouFlyToWorld(world, sectionIndex = 0) {
     phase: "returnZoom",
     start: performance.now(),
     fromZoom: currentZoom,
+fromPlanetZ:
+  camouSecondPlanetGroup.position.z,
 
+fromPlanetScale:
+  camouSecondPlanetGroup.scale.x,
     planetOrientation:
       exploredOrientation.clone(),
 
@@ -5747,17 +5806,12 @@ else if (f.phase === "zoomIn") {
 
     camouSecondPlanetGroup.scale.setScalar(1);
     setZoom(focus);
-
-      // Kamera- und Planetenausrichtung
-      // gemeinsam zuruecksetzen.
-      camera.rotation.z = 0;
-
-      rotationX = 0;
-      rotationY = 0;
-
-      camouSecondPlanetGroup.rotation.set(
-        0, 0, 0
-      );
+      
+// CAMOU bleibt hinter dem Projektplaneten
+// auf der gespeicherten SCHAU-REIN-Ansicht.
+rotationX = camouPortalView.x;
+rotationY = camouPortalView.y;
+camera.rotation.z = camouPortalView.roll;
 
 camouExploreX = 0;
 camouExploreY = 0;
@@ -5784,18 +5838,22 @@ else if (f.phase === "returnZoom") {
 
   // Umgekehrter Hinzoom:
   // Planet, Bild und Text werden kleiner.
-  camouSecondPlanetGroup.position.z =
-    lerp(
-      CAMOU_FULL_FRONT_Z,
-      CAMOU_MINI_FRONT_Z,
-      u
-    );
 
-  camouSecondPlanetGroup.scale.setScalar(
-    lerp(1, miniScale, u)
-  );
+// Von der aktuellen manuellen Zoomposition
+// ohne Groessensprung zurueckfliegen.
+camouSecondPlanetGroup.position.z = lerp(
+  f.fromPlanetZ,
+  CAMOU_MINI_FRONT_Z,
+  u
+);
 
-  setZoom(lerp(f.fromZoom, overview, u));
+camouSecondPlanetGroup.scale.setScalar(
+  lerp(f.fromPlanetScale, miniScale, u)
+);
+
+setZoom(
+  lerp(f.fromZoom, overview, u)
+);
 
   // CAMOU bleibt unveraendert dahinter.
 
