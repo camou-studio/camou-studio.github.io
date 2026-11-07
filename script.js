@@ -3400,8 +3400,19 @@ if (pointers.size >= 2) {
     currentAngle - pinchAngle
   );
 
-  // Richtige Drehrichtung
-  camera.rotation.z += delta;
+  // Zwei-Finger-Drehung:
+  // CAMOU dreht weiterhin die Kamera.
+  // Der Projektplanet dreht sich selbst.
+  if (
+    camouWorldMode === "planet" &&
+    !camouWorldFlight
+  ) {
+    camouExploreRoll = wrapAngle(
+      camouExploreRoll + delta
+    );
+  } else {
+    camera.rotation.z += delta;
+  }
 
   // Winkel für nächste Bewegung speichern
   pinchAngle = currentAngle;
@@ -3431,7 +3442,15 @@ if (pointers.size >= 2) {
     );
 
 // Kameraneigung bei manueller Drehung berücksichtigen
-const roll = camera.rotation.z;
+
+const roll =
+  camera.rotation.z +
+  (
+    camouWorldMode === "planet"
+      ? camouExploreRoll
+      : 0
+  );
+
 
 const cosRoll = Math.cos(roll);
 const sinRoll = Math.sin(roll);
@@ -3661,9 +3680,17 @@ const camouProjectYawAxis =
 const camouProjectYawQuat =
   new THREE.Quaternion();
 
-  // Freie Erkundung des Projektplaneten.
-  let camouExploreX = 0;
-  let camouExploreY = 0;
+ 
+// Freie Erkundung des Projektplaneten.
+let camouExploreX = 0;
+let camouExploreY = 0;
+let camouExploreRoll = 0;
+
+const camouExploreRollAxis =
+  new THREE.Vector3(0, 0, 1);
+
+const camouExploreRollQuaternion =
+  new THREE.Quaternion();
 
 const camouExploreEuler =
   new THREE.Euler(0, 0, 0, "XYZ");
@@ -3678,9 +3705,22 @@ function camouGetExploreQuaternion() {
     0
   );
 
-  return camouExploreQuaternion
-    .setFromEuler(camouExploreEuler);
+  camouExploreQuaternion.setFromEuler(
+    camouExploreEuler
+  );
+
+  camouExploreRollQuaternion.setFromAxisAngle(
+    camouExploreRollAxis,
+    camouExploreRoll
+  );
+
+  // Die Zwei-Finger-Drehung mit der
+  // freien Planetendrehung kombinieren.
+  return camouExploreQuaternion.premultiply(
+    camouExploreRollQuaternion
+  );
 }
+
 
 function camouHorizontalDirection() {
   const tilt = camouWorldMode === "planet"
@@ -5836,7 +5876,8 @@ camera.rotation.z = camouPortalView.roll;
 
 camouExploreX = 0;
 camouExploreY = 0;
-
+camouExploreRoll = 0;
+     
 camouWorldMode = "planet";
 camouSetSecondProjectInfo();
      
