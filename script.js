@@ -5474,6 +5474,12 @@ function camouUpdateWorldFlight(now) {
       );
     }
 
+    // Beim Rueckflug den Planeten hinter CAMOU legen.
+    if (f.to === "camou" && t >= 0.78) {
+      camouSetPlanetSpriteForeground(false);
+      globeGroup.visible = true;
+    }
+
     sceneNeedsRender = true;
 
     if (elapsed >= CAMOU_ROTATE_MS) {
@@ -5495,9 +5501,14 @@ function camouUpdateWorldFlight(now) {
 
         lastIndicatorIndex = -1;
         camouOriginalIndicator();
+      
       } else {
         camera.rotation.z = 0;
+        rotationX = 0;
+        rotationY = 0;
       }
+
+      f.phase = "in";
 
       f.phase = "in";
       f.start = now;
@@ -5510,10 +5521,11 @@ function camouUpdateWorldFlight(now) {
   // PHASE 3: VOLLSTAENDIG HERANZOOMEN
   // =====================================
 
+  
+  // 3. Die neue Oberflaeche erscheint bereits
+  // in der Schlussphase des Heranzoomens.
   if (f.phase === "in") {
-    const t = progress(
-      CAMOU_ZOOM_IN_MS
-    );
+    const t = progress(CAMOU_ZOOM_IN_MS);
 
     setZoom(
       lerp(
@@ -5535,6 +5547,29 @@ function camouUpdateWorldFlight(now) {
         scale,
         1
       );
+
+      // Die neue Planetenoberflaeche erscheint
+      // waehrend der letzten 30 % des Zooms.
+      if (camouSecondPlanetGroup) {
+        if (t >= 0.70) {
+          camouSecondPlanetGroup.visible = true;
+
+          // Projektinhalt bleibt noch verborgen.
+          if (camouSecondPlanetPanel) {
+            camouSecondPlanetPanel.visible = false;
+          }
+
+          const blend = smooth(
+            (t - 0.70) / 0.30
+          );
+
+          // Kleine Planetenansicht ausblenden.
+          camouPlanet.material.opacity =
+            1 - blend;
+
+          sceneNeedsRender = true;
+        }
+      }
     }
 
     if (elapsed >= CAMOU_ZOOM_IN_MS) {
@@ -5543,7 +5578,33 @@ function camouUpdateWorldFlight(now) {
       if (f.to === "camou") {
         camouRestorePlanetSprite();
         camouWorldFlight = null;
+
+      } else if (camouSecondPlanetGroup) {
+        // Zoom und Oberflaechenwechsel fertig.
+        camouSecondPlanetGroup.visible = true;
+
+        camouPlanet.material.opacity = 0;
+        camouPlanet.visible = false;
+
+        camouSetPlanetSpriteForeground(false);
+
+        camouWorldMode = "planet";
+        camouSetSecondProjectInfo();
+
+        // Erst jetzt Bild und Text einblenden.
+        if (camouSecondPlanetPanel) {
+          camouSecondPlanetPanel.visible = true;
+
+          camouSecondPlanetPanel.material.opacity =
+            0;
+        }
+
+        f.phase = "reveal";
+        f.start = now;
+
       } else {
+        // Falls die 3D-Oberflaeche beim ersten
+        // Besuch noch nicht vorbereitet ist.
         f.phase = "ready";
         f.start = now;
       }
