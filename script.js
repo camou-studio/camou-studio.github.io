@@ -3729,18 +3729,39 @@ function animate(now = 0) {
   );
 
 
-if (camouSecondPlanetGroup) {
-  if (camouWorldFlight?.to === "camou") {
-    // Projektplanet behaelt beim Rueckflug
-    // seine eigene Ausrichtung.
-    camouSecondPlanetGroup.rotation.copy(
-      camouWorldFlight.planetRotation
-    );
 
-  } else if (camouWorldFlight?.to === "planet") {
+if (camouSecondPlanetGroup) {
+  const flight = camouWorldFlight;
+
+  if (flight?.to === "camou") {
+    const turn = flight.phase === "cover"
+      ? smooth(
+          (now - flight.start) /
+          (CAMOU_ZOOM_IN_MS * 0.45)
+        )
+      : 1;
+
+    // Rueckflug: Projektflaeche dreht sich weg.
     camouSecondPlanetGroup.rotation.set(
       0,
+      lerp(0, -0.42, turn),
+      flight.planetRotation.z
+    );
+
+  } else if (flight?.to === "planet") {
+    const turn = flight.phase === "in"
+      ? smooth(
+          (now - flight.start -
+            CAMOU_ZOOM_IN_MS * 0.55) /
+          (CAMOU_ZOOM_IN_MS * 0.45)
+        )
+      : 0;
+
+    // Hinflug: Projektflaeche dreht sich
+    // zum Betrachter.
+    camouSecondPlanetGroup.rotation.set(
       0,
+      lerp(-0.42, 0, turn),
       camera.rotation.z
     );
 
@@ -5408,7 +5429,6 @@ if (world === "planet") {
 
     camouSetPlanetSpriteForeground(true);
   }
-
   
 camouWorldFlight = {
   to: world,
@@ -5424,10 +5444,13 @@ camouWorldFlight = {
   planetRotation: camouSecondPlanetGroup
     ? camouSecondPlanetGroup.rotation.clone()
     : new THREE.Euler()
+
 };
 // Ende von camouFlyToWorld()
 }
+
 function camouUpdateReturnFlight(now) {
+
   const f = camouWorldFlight;
   if (!f || f.to !== "camou") return;
 
@@ -5440,34 +5463,40 @@ function camouUpdateReturnFlight(now) {
     roll: camera.rotation.z
   };
 
-  // 1. Projektinhalte ausblenden,
-  // waehrend der Planet bereits kleiner wird.
+ 
+  // Rueckwaerts: Inhalt bleibt fest auf der
+  // 3D-Oberflaeche. Die Kamera entfernt sich.
   if (f.phase === "cover") {
-    const t = progress(CAMOU_WORLD_REVEAL_MS);
+    const t = progress(CAMOU_ZOOM_IN_MS * 0.45);
 
-    setZoom(lerp(
+    const middleZoom = lerp(
       CAMOU_WORLD_OVERVIEW,
       CAMOU_WORLD_FOCUS,
-      1 - 0.12 * t
+      0.55
+    );
+
+    setZoom(lerp(
+      CAMOU_WORLD_FOCUS,
+      middleZoom,
+      t
     ));
 
-    if (camouSecondPlanetPanel) {
-      camouSecondPlanetPanel.material.opacity =
-        1 - smooth((t - 0.25) / 0.75);
+    if (camouSecondPlanetGroup) {
+      camouSecondPlanetGroup.visible = true;
     }
 
-    if (elapsed >= CAMOU_WORLD_REVEAL_MS) {
-      if (camouSecondPlanetPanel) {
-        camouSecondPlanetPanel.visible = false;
-      }
+    if (camouSecondPlanetPanel) {
+      camouSecondPlanetPanel.visible = true;
+      camouSecondPlanetPanel.material.opacity = 1;
+    }
 
+    camouPlanet.material.opacity = 0;
+
+    if (elapsed >= CAMOU_ZOOM_IN_MS * 0.45) {
       // CAMOU unsichtbar auf die urspruengliche
-      // SCHAU-REIN-Ansicht vorbereiten.
+      // SCHAU-REIN-Ansicht ausrichten.
       rotationX = portal.x;
       rotationY = portal.y;
-
-      globeGroup.visible = true;
-      camouSetGlobeFlightOpacity(0);
 
       f.phase = "returnZoom";
       f.start = now;
@@ -5477,11 +5506,12 @@ function camouUpdateReturnFlight(now) {
     return;
   }
 
-  // 2. Heranzoomen rueckwaerts:
-  // 3D-Planet -> Sprite -> Gesamtansicht.
+  // Weitere Verkleinerung:
+  // Echte 3D-Kugel wird zum kleinen Planeten.
   if (f.phase === "returnZoom") {
-    const t =
-      0.88 * (1 - progress(CAMOU_ZOOM_IN_MS));
+    const t = 0.55 * (
+      1 - progress(CAMOU_ZOOM_IN_MS * 0.55)
+    );
 
     setZoom(lerp(
       CAMOU_WORLD_OVERVIEW,
@@ -5498,32 +5528,37 @@ function camouUpdateReturnFlight(now) {
     camouPlanet.scale.set(scale, scale, 1);
     camouPlanet.position.set(0, 0, -25);
     camouPlanet.visible = true;
-
     camouSetPlanetSpriteForeground(true);
 
-    // Die kleine Planetenansicht uebernimmt
-    // die grosse 3D-Oberflaeche.
-    camouPlanet.material.opacity =
-      smooth((0.88 - t) / 0.18);
+    // Kleine Planetenansicht uebernimmt
+    // die echte 3D-Kugel schrittweise.
+    const spriteOpacity = smooth(
+      (0.55 - t) / 0.35
+    );
+
+    camouPlanet.material.opacity = spriteOpacity;
 
     if (camouSecondPlanetGroup) {
-      camouSecondPlanetGroup.visible = t > 0.70;
+      camouSecondPlanetGroup.visible = t > 0.20;
     }
 
-    // Kamera erst umstellen, wenn die
-    // grosse 3D-Oberflaeche abgedeckt ist.
-    if (t <= 0.70 && !f.portalRollRestored) {
+    // Erst wenn der 3D-Planet bedeckt ist,
+    // den Kamerawinkel zuruecksetzen.
+    // Die CAMOU-Kugel ist dabei unsichtbar.
+    if (t <= 0.20 && !f.portalRollRestored) {
       camera.rotation.z = portal.roll;
       f.portalRollRestored = true;
     }
 
-    // CAMOU mit der gespeicherten
-    // SCHAU-REIN-Ausrichtung einblenden.
+    // CAMOU erst mit korrekter
+    // SCHAU-REIN-Ausrichtung sichtbar machen.
     camouSetGlobeFlightOpacity(
-      1 - smooth(t / 0.70)
+      t >= 0.20
+        ? 0
+        : 1 - smooth(t / 0.20)
     );
 
-    if (elapsed >= CAMOU_ZOOM_IN_MS) {
+    if (elapsed >= CAMOU_ZOOM_IN_MS * 0.55) {
       setZoom(CAMOU_WORLD_OVERVIEW);
 
       camouPlanet.scale.set(
@@ -5945,31 +5980,28 @@ f.start = now;
         1
       );
 
-      // Die neue Planetenoberflaeche erscheint
-      // waehrend der letzten 30 % des Zooms.
-      if (camouSecondPlanetGroup) {
-        if (t >= 0.70) {
-          camouSecondPlanetGroup.visible = true;
+      
+      // Die 3D-Kugel mitsamt Text und Bild
+      // erscheint bereits waehrend des Zoomens.
+      if (camouSecondPlanetGroup && t >= 0.55) {
+        camouSecondPlanetGroup.visible = true;
 
-          // Projektinhalt bleibt noch verborgen.
-          if (camouSecondPlanetPanel) {
-            camouSecondPlanetPanel.visible = false;
-          }
+        if (camouSecondPlanetPanel) {
+          camouSecondPlanetPanel.visible = true;
+          camouSecondPlanetPanel.material.opacity = 1;
+        }
 
-          const blend = smooth(
-            (t - 0.70) / 0.30
-          );
-
-          // Kleine Planetenansicht ausblenden.
-          camouPlanet.material.opacity =
-            1 - blend;
+        // Die bisherige kleine Planetenansicht
+        // verschwindet waehrend des Zooms.
+        camouPlanet.material.opacity =
+          1 - smooth((t - 0.55) / 0.45);
 
           sceneNeedsRender = true;
-        }
       }
     }
 
     if (elapsed >= CAMOU_ZOOM_IN_MS) {
+
       setZoom(CAMOU_WORLD_FOCUS);
 
       if (f.to === "camou") {
@@ -6014,17 +6046,15 @@ camouSetGlobeFlightOpacity(1);
         camouWorldMode = "planet";
         camouSetSecondProjectInfo();
 
-        // Erst jetzt Bild und Text einblenden.
-        if (camouSecondPlanetPanel) {
-          camouSecondPlanetPanel.visible = true;
+        
+// Bild und Text wurden bereits mit dem
+// Planeten waehrend des Zooms vergroessert.
+if (camouSecondPlanetPanel) {
+  camouSecondPlanetPanel.visible = true;
+  camouSecondPlanetPanel.material.opacity = 1;
+}
 
-          camouSecondPlanetPanel.material.opacity =
-            0;
-        }
-
-        f.phase = "reveal";
-        f.start = now;
-
+camouWorldFlight = null;
 
       } else {
         globeGroup.visible = false;
