@@ -4678,7 +4678,7 @@ window.addEventListener(
 /* =========================================
    STANDARD-ZOOM LEICHT VERGRÖSSERN
 ========================================= */
-
+let camouWorldFlight = null;
 const camouV2OriginalZoom = setZoom;
 
 setZoom = function(value) {
@@ -4741,7 +4741,6 @@ inImage = function(point, index) {
 let camouSecondPlanetGroup = null;
 let camouSecondPlanetReady = null;
 let camouWorldMode = "camou";
-let camouWorldFlight = null;
 let camouSpriteHome = null;
 
 const CAMOU_WORLD_OVERVIEW = CAMOU_OVERVIEW_ZOOM;
