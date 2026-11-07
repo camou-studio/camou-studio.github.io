@@ -3728,13 +3728,24 @@ function animate(now = 0) {
     0
   );
 
-  if (camouSecondPlanetGroup) {
+
+if (camouSecondPlanetGroup) {
+  if (camouWorldFlight?.to === "planet") {
+    // Neue Welt waehrend des Hinflugs
+    // unabhaengig von CAMOU ausrichten.
+    camouSecondPlanetGroup.rotation.set(
+      0,
+      0,
+      camera.rotation.z
+    );
+  } else {
     camouSecondPlanetGroup.rotation.set(
       rotationX,
       rotationY,
       0
     );
   }
+}
 
   // Video nur bei neuen Frames.
   if (
@@ -4679,11 +4690,11 @@ setZoom = function(value) {
 
   camouV2OriginalZoom(corrected);
 
-  if (!isDragging) {
-    camouV2Tags(
-      currentZoom > defaultZoom + 0.4
-    );
-  }
+if (!isDragging && !camouWorldFlight) {
+  camouV2Tags(
+    currentZoom > defaultZoom + 0.4
+  );
+}
 };
 
 /* =========================================
@@ -5584,13 +5595,7 @@ function camouUpdateWorldFlight(now) {
 
         lastIndicatorIndex = -1;
         camouOriginalIndicator();
-      
-      } else {
-        camera.rotation.z = 0;
-        rotationX = 0;
-        rotationY = 0;
-      }
-
+   }   
 f.phase = "in";
 f.start = now;
     }
@@ -5675,9 +5680,25 @@ f.start = now;
         // darf aus dem Rendering genommen werden.
         globeGroup.visible = false;
 
-        // Urspruengliche Materialwerte fuer
-        // den spaeteren Rueckflug wiederherstellen.
-        camouSetGlobeFlightOpacity(1);
+
+globeGroup.visible = false;
+
+// CAMOU ist jetzt unsichtbar.
+// Erst jetzt die Rotation fuer den
+// erkundbaren Projektplaneten zuruecksetzen.
+camera.rotation.z = 0;
+rotationX = 0;
+rotationY = 0;
+
+camouSecondPlanetGroup.rotation.set(
+  0,
+  0,
+  0
+);
+
+// Urspruengliche Materialwerte fuer
+// den spaeteren Rueckflug wiederherstellen.
+camouSetGlobeFlightOpacity(1);
 
         // Zoom und Oberflaechenwechsel fertig.
         camouSecondPlanetGroup.visible = true;
