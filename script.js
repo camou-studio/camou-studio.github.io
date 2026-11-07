@@ -3446,21 +3446,28 @@ const vertical =
 // Etwas feinfühligere Steuerung
 const sensitivity = CONFIG.dragSpeed * 0.80;
 
+
 const mx = horizontal * sensitivity;
 const my = vertical * sensitivity;
 
+// Horizontale Drehrichtung an die
+// aktuelle Ausrichtung anpassen.
+const horizontalDirection =
+  camouHorizontalDirection();
 
-// Die jeweils aktive Welt drehen.
 if (camouWorldMode === "planet") {
-  camouExploreY += mx;
+  camouExploreY += mx * horizontalDirection;
   camouExploreX += my;
+
   sceneNeedsRender = true;
 } else {
-  rotationY += mx;
+  rotationY += mx * horizontalDirection;
   rotationX += my;
 }
 
-// Trägheit übernehmen
+// Geschwindigkeit in Bildschirmrichtung
+// speichern. Die Korrektur erfolgt auch
+// beim Nachlaufen separat.
 velocityY = mx / factor;
 velocityX = my / factor;
 
@@ -3583,7 +3590,7 @@ if (event.key === "ArrowRight") {
   event.preventDefault();
 
   if (camouWorldMode === "planet") {
-    camouExploreY += 0.25;
+    camouExploreY += 0.25 * camouHorizontalDirection();
     sceneNeedsRender = true;
   } else {
     goToSection(currentIndex() + 1);
@@ -3594,7 +3601,7 @@ if (event.key === "ArrowLeft") {
   event.preventDefault();
 
   if (camouWorldMode === "planet") {
-    camouExploreY -= 0.25;
+    camouExploreY -= 0.25 * camouHorizontalDirection();
     sceneNeedsRender = true;
   } else {
     goToSection(currentIndex() - 1);
@@ -3675,6 +3682,15 @@ function camouGetExploreQuaternion() {
     .setFromEuler(camouExploreEuler);
 }
 
+function camouHorizontalDirection() {
+  const tilt = camouWorldMode === "planet"
+    ? camouExploreX
+    : rotationX;
+
+  // Horizontale Richtung nach
+  // einer Ueberkopf-Drehung korrigieren.
+  return Math.cos(tilt) < 0 ? -1 : 1;
+}
 
 function animate(now = 0) {
   requestAnimationFrame(animate);
@@ -3776,35 +3792,40 @@ function animate(now = 0) {
       }
     }
 
-  
+     
 } else if (!isDragging && !camouWorldFlight) {
+  const horizontalDirection =
+    camouHorizontalDirection();
 
   if (camouWorldMode === "planet") {
-    camouExploreY += velocityY;
+    camouExploreY +=
+      velocityY * horizontalDirection;
+
     camouExploreX += velocityX;
 
     if (velocityX !== 0 || velocityY !== 0) {
       sceneNeedsRender = true;
     }
-
   } else {
-    rotationY += velocityY;
+    rotationY +=
+      velocityY * horizontalDirection;
+
     rotationX += velocityX;
   }
 
-  // Bestehende Reibungsberechnung folgt.
-velocityY *= CONFIG.friction;
-velocityX *= CONFIG.friction;
-    if (Math.abs(velocityY) < 0.00004) {
-      velocityY = 0;
-    }
+  velocityY *= CONFIG.friction;
+  velocityX *= CONFIG.friction;
 
-    if (Math.abs(velocityX) < 0.00004) {
-      velocityX = 0;
-    }
+  if (Math.abs(velocityY) < 0.00004) {
+    velocityY = 0;
   }
 
-  globeGroup.rotation.set(
+  if (Math.abs(velocityX) < 0.00004) {
+    velocityX = 0;
+  }
+}
+
+    globeGroup.rotation.set(
     rotationX,
     rotationY,
     0
