@@ -3408,7 +3408,7 @@ if (pointers.size >= 2) {
     !camouWorldFlight
   ) {
     camouExploreRoll = wrapAngle(
-      camouExploreRoll + delta
+      camouExploreRoll - delta
     );
   } else {
     camera.rotation.z += delta;
