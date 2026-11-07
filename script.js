@@ -2514,46 +2514,13 @@ async function createGlobeTexture() {
   ].map(loadImage));
 
 
-let camouVisualSlideLoading = null;
 
-function camouEnsureVisualSlides() {
-  if (camouVisualSlideLoading) {
-    return camouVisualSlideLoading;
-  }
-
-  camouVisualSlideLoading = Promise.all(
-    ASSETS.visualSlides.slice(1).map(loadImage)
-  ).then(images => {
-    images.forEach((image, i) => {
-      visualImages[i + 1] = image;
-    });
-
-    refreshVisualsTexture();
-  });
-
-  return camouVisualSlideLoading;
-}
-
-function advanceVisualSlide() {
-  if (!visualImages.length) return;
-
-  if (visualImages.some(image => !image)) {
-    camouEnsureVisualSlides().then(() => {
-      visualIndex =
-        (visualIndex + 1) % visualImages.length;
-
-      refreshVisualsTexture();
-    });
-
-    return;
-  }
-
-  visualIndex =
-    (visualIndex + 1) % visualImages.length;
-
-  refreshVisualsTexture();
-}
-
+  // Erstes VISUALS-Bild bereits vorhanden.
+  // Weitere Bilder erst beim Aufruf laden.
+  visualImages = [
+    images[2],
+    ...ASSETS.visualSlides.slice(1).map(() => null)
+  ];
 
   visualIndex = 0;
   await canvasFontsReady;
@@ -3274,7 +3241,7 @@ stage.addEventListener(
       event.target.closest(".zoom-controls")
     ) return;
 
-    event.preventDefault();
+        if (camouWorldFlight) return;
 
     setZoom(
       currentZoom +
@@ -3291,10 +3258,11 @@ stage.addEventListener(
 stage.addEventListener(
   "pointerdown",
   event => {
-    if (
+        if (
       spotifyOpen ||
       contactOpen ||
-      event.target !== renderer.domElement
+      event.target !== renderer.domElement ||
+      camouWorldFlight
     ) return;
 
     const point = texturePoint(event);
@@ -3737,7 +3705,7 @@ function animate(now = 0) {
       }
     }
 
-  } else if (!isDragging) {
+   } else if (!isDragging && !camouWorldFlight) {
 
     rotationY += velocityY;
     rotationX += velocityX;
@@ -4843,55 +4811,173 @@ function camouCreatePortal() {
    GESTEINSOBERFLAECHE DER ZWEITEN KUGEL
 ========================================= */
 
+
 function camouCreateRockyWorldTexture() {
-  const w = 512;
-  const h = 256;
+  const width = mobile ? 512 : 768;
+  const height = width / 2;
 
   const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = width;
+  canvas.height = height;
 
-  const c = canvas.getContext("2d");
-  const data = c.createImageData(w, h);
+  const ctx = canvas.getContext("2d");
+  const image = ctx.createImageData(width, height);
 
-  for (let y = 0; y < h; y++) {
-    const v = y / h;
+  function hash(x, y, z) {
+    let h =
+      Math.imul(x, 374761393) ^
+      Math.imul(y, 668265263) ^
+      Math.imul(z, 1442695041);
 
-    for (let x = 0; x < w; x++) {
-      const u = x / w;
+    h = Math.imul(
+      h ^ (h >>> 13),
+      1274126177
+    );
 
-      const n =
-        0.50 * Math.sin(
-          u * Math.PI * 8 +
-          Math.sin(v * 13) * 3.7
-        ) +
-        0.30 * Math.cos(
-          u * Math.PI * 14 - v * 29
-        ) +
-        0.20 * Math.sin(
-          u * Math.PI * 28 +
-          Math.cos(v * 34)
+    return (
+      (h ^ (h >>> 16)) >>> 0
+    ) / 4294967295;
+  }
+
+  function noise(x, y, z) {
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+
+    let fx = x - ix;
+    let fy = y - iy;
+    let fz = z - iz;
+
+    fx = fx * fx * (3 - 2 * fx);
+    fy = fy * fy * (3 - 2 * fy);
+    fz = fz * fz * (3 - 2 * fz);
+
+    const mix = (a, b, t) =>
+      a + (b - a) * t;
+
+    const layer = dz => {
+      const a = mix(
+        hash(ix, iy, iz + dz),
+        hash(ix + 1, iy, iz + dz),
+        fx
+      );
+
+      const b = mix(
+        hash(ix, iy + 1, iz + dz),
+        hash(ix + 1, iy + 1, iz + dz),
+        fx
+      );
+
+      return mix(a, b, fy);
+    };
+
+    return mix(layer(0), layer(1), fz);
+  }
+
+  // Echte 3D-Koordinaten verhindern
+  // sternfoermige Muster an den Polen.
+  for (let y = 0; y < height; y++) {
+    const lat =
+      Math.PI * (
+        0.5 - (y + 0.5) / height
+      );
+
+    const cy = Math.sin(lat);
+    const cr = Math.cos(lat);
+
+    for (let x = 0; x < width; x++) {
+      const lon =
+        2 * Math.PI * (
+          (x + 0.5) / width
         );
 
-      const mark = 0.5 + 0.5 * n;
-      const i = (y * w + x) * 4;
+      const nx = -Math.cos(lon) * cr;
+      const ny = cy;
+      const nz = Math.sin(lon) * cr;
 
-      data.data[i] = 82 + 35 * mark;
-      data.data[i + 1] = 82 + 32 * mark;
-      data.data[i + 2] = 111 + 40 * mark;
-      data.data[i + 3] = 255;
+      const large = noise(
+        nx * 4.5 + 7,
+        ny * 4.5 + 11,
+        nz * 4.5 + 19
+      );
+
+      const medium = noise(
+        nx * 11.2 + 3,
+        ny * 11.2 + 17,
+        nz * 11.2 + 23
+      );
+
+      const fine = noise(
+        nx * 28 + 5,
+        ny * 28 + 13,
+        nz * 28 + 31
+      );
+
+      const mineral =
+        0.57 * large +
+        0.30 * medium +
+        0.13 * fine;
+
+      const relief =
+        (mineral - 0.5) * 75;
+
+      // Lavendelgraue, mineralische Oberflaeche.
+      const light = Math.max(
+        0,
+        nx * -0.48 +
+        ny * 0.58 +
+        nz * 0.66
+      );
+
+      const shade = 0.40 + 0.60 * light;
+      const i = (y * width + x) * 4;
+
+      image.data[i] = Math.max(
+        0,
+        Math.min(
+          255,
+          (113 + relief) * shade
+        )
+      );
+
+      image.data[i + 1] = Math.max(
+        0,
+        Math.min(
+          255,
+          (111 + relief * 0.91) * shade
+        )
+      );
+
+      image.data[i + 2] = Math.max(
+        0,
+        Math.min(
+          255,
+          (140 + relief * 1.10) * shade
+        )
+      );
+
+      image.data[i + 3] = 255;
     }
   }
 
-  c.putImageData(data, 0, 0);
+  ctx.putImageData(image, 0, 0);
 
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = new THREE.CanvasTexture(
+    canvas
+  );
 
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+  texture.anisotropy = Math.min(
+    renderer.capabilities.getMaxAnisotropy(),
+    4
+  );
 
   return texture;
 }
+
 
 /* =========================================
    INHALT DES ZWEITEN PROJEKTS
@@ -4985,85 +5071,100 @@ function camouLoadSecondProjectImage() {
    ZWEITEN PLANETEN BEI BEDARF ERSTELLEN
 ========================================= */
 
+
+let camouSecondPlanetPanel = null;
+let camouSecondPlanetPanelTexture = null;
+
 function camouEnsureSecondPlanet() {
   if (camouSecondPlanetReady) {
     return camouSecondPlanetReady;
   }
 
-  camouSecondPlanetReady = (async () => {
-    const group = new THREE.Group();
+  // Geometrie und Textur erst beim Besuch erzeugen.
+  // Das Projektbild wird unabhaengig nachgeladen.
+  camouSecondPlanetReady =
+    Promise.resolve().then(() => {
 
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(
-        CONFIG.radius, 96, 64
-      ),
-      new THREE.MeshStandardMaterial({
-        map: camouCreateRockyWorldTexture(),
-        roughness: 0.96,
-        metalness: 0
-      })
-    );
+      const group = new THREE.Group();
 
-    group.add(sphere);
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(
+          CONFIG.radius,
+          mobile ? 64 : 96,
+          mobile ? 48 : 64
+        ),
+        new THREE.MeshBasicMaterial({
+          map: camouCreateRockyWorldTexture()
+        })
+      );
 
-    const canvas = document.createElement("canvas");
+      group.add(sphere);
 
-    canvas.width = CAMOU_V2_W;
-    canvas.height = CAMOU_V2_H;
+      const canvas = document.createElement(
+        "canvas"
+      );
 
-    const panelTexture =
-      new THREE.CanvasTexture(canvas);
+      canvas.width = CAMOU_V2_W;
+      canvas.height = CAMOU_V2_H;
 
-    panelTexture.colorSpace =
-      THREE.SRGBColorSpace;
+      const texture = new THREE.CanvasTexture(
+        canvas
+      );
 
-    const panel = new THREE.Mesh(
-      camouV2Geometry({
-        lon: 0,
-        lat: 0,
-        tiltR: 0
-      }),
-      new THREE.MeshBasicMaterial({
-        map: panelTexture,
-        transparent: true,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      })
-    );
+      texture.colorSpace =
+        THREE.SRGBColorSpace;
 
-    panel.renderOrder = 2;
-    group.add(panel);
+      const panel = new THREE.Mesh(
+        camouV2Geometry({
+          lon: 0,
+          lat: 0,
+          tiltR: 0
+        }),
+        new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        })
+      );
 
-    // Bereich sofort anzeigen, Bild folgt spaeter.
-    camouDrawSecondProject(
-      canvas.getContext("2d"),
-      null
-    );
+      panel.renderOrder = 2;
+      panel.visible = false;
+      group.add(panel);
 
-    panelTexture.needsUpdate = true;
+      camouDrawSecondProject(
+        canvas.getContext("2d"),
+        null
+      );
 
-    group.visible = false;
-    scene.add(group);
+      texture.needsUpdate = true;
 
-    camouSecondPlanetGroup = group;
+      group.visible = false;
+      scene.add(group);
 
-    // Das Bild wird erst jetzt geladen.
-    const image =
-      await camouLoadSecondProjectImage();
+      camouSecondPlanetGroup = group;
+      camouSecondPlanetPanel = panel;
+      camouSecondPlanetPanelTexture = texture;
 
-    camouDrawSecondProject(
-      canvas.getContext("2d"),
-      image
-    );
+      // Das Bild blockiert den Navigationsflug nicht.
+      void camouLoadSecondProjectImage()
+        .then(image => {
+          camouDrawSecondProject(
+            canvas.getContext("2d"),
+            image
+          );
 
-    panelTexture.needsUpdate = true;
-    sceneNeedsRender = true;
+          texture.needsUpdate = true;
+          sceneNeedsRender = true;
+        });
 
-    return group;
-  })();
+      return group;
+    });
 
   return camouSecondPlanetReady;
 }
+
 
 /* =========================================
    ZURUECK-BUTTON
@@ -5113,11 +5214,76 @@ camouReturnButton.addEventListener(
    NAVIGATIONSFLUG ZWISCHEN DEN PLANETEN
 ========================================= */
 
+
+/* =========================================
+   PLANETENWECHSEL
+   ZUERST BEWEGUNG, DANN ANSICHTSWECHSEL
+========================================= */
+
+const CAMOU_WORLD_CROSSFADE_MS = 650;
+const CAMOU_WORLD_REVEAL_MS = 460;
+const CAMOU_PLANET_SPRITE_RADIUS = 0.89;
+
+function camouSpriteFocusScale() {
+  // Sprite-Silhouette an die 3D-Kugel anpassen.
+  const r = CONFIG.radius;
+  const z = CAMOU_WORLD_FOCUS;
+
+  return (
+    25 * 2 * r /
+    Math.sqrt(z * z - r * r) /
+    CAMOU_PLANET_SPRITE_RADIUS
+  );
+}
+
+function camouSetPlanetSpriteForeground(enabled) {
+  camouPlanet.material.depthTest = !enabled;
+  camouPlanet.material.needsUpdate = true;
+  camouPlanet.renderOrder = enabled ? 20 : -9;
+}
+
+function camouRestorePlanetSprite() {
+  if (!camouSpriteHome) return;
+
+  camouPlanet.position.copy(
+    camouSpriteHome.position
+  );
+
+  camouPlanet.scale.copy(
+    camouSpriteHome.scale
+  );
+
+  camouPlanet.material.opacity = 1;
+  camouPlanet.visible = true;
+
+  camouSetPlanetSpriteForeground(false);
+}
+
+function camouSetSecondProjectInfo() {
+  navButtons.forEach(button => {
+    button.classList.remove("active");
+  });
+
+  if ($("current-section")) {
+    $("current-section").textContent =
+      "PROJEKT 02";
+  }
+
+  if ($("section-number")) {
+    $("section-number").textContent =
+      "02 / 02";
+  }
+
+  camouReturnButton.style.display =
+    "block";
+}
+
 function camouFlyToWorld(
   world,
   sectionIndex = 0
 ) {
   if (camouWorldFlight) return;
+  if (world === camouWorldMode) return;
 
   if (world === "planet") {
     camouSpriteHome = {
@@ -5125,21 +5291,46 @@ function camouFlyToWorld(
       scale: camouPlanet.scale.clone()
     };
 
-    // Erst jetzt den zweiten Planeten erzeugen.
+    // Die interaktive Welt erst bei Bedarf laden.
     void camouEnsureSecondPlanet();
   }
 
   velocityX = 0;
   velocityY = 0;
+
   isDragging = false;
   menuAnimating = false;
+
   camouNavPhase = "idle";
+
   pointers.clear();
+  pointerStart = null;
+
+  stage.classList.remove("dragging");
+
+  if (world === "camou") {
+    camouPlanet.position.set(0, 0, -25);
+
+    const scale = camouSpriteFocusScale();
+
+    camouPlanet.scale.set(
+      scale,
+      scale,
+      1
+    );
+
+    camouPlanet.material.opacity = 0;
+    camouPlanet.visible = true;
+
+    camouSetPlanetSpriteForeground(true);
+  }
 
   camouWorldFlight = {
     to: world,
     index: sectionIndex,
-    phase: "out",
+    phase: world === "camou"
+      ? "cover"
+      : "out",
     start: performance.now(),
     fromZoom: currentZoom
   };
@@ -5156,157 +5347,299 @@ function camouUpdateWorldFlight(now) {
     now - f.start
   );
 
+  const progress = duration =>
+    smooth(elapsed / duration);
+
+  // =====================================
+  // RUECKWEG: 3D-ANSICHT AUSBLENDEN
+  // =====================================
+
+  if (f.phase === "cover") {
+    const t = progress(
+      CAMOU_WORLD_CROSSFADE_MS
+    );
+
+    camouPlanet.material.opacity = t;
+
+    if (camouSecondPlanetPanel) {
+      camouSecondPlanetPanel.material.opacity =
+        1 - t;
+    }
+
+    sceneNeedsRender = true;
+
+    if (
+      elapsed >= CAMOU_WORLD_CROSSFADE_MS
+    ) {
+      camouSecondPlanetGroup.visible = false;
+
+      f.phase = "out";
+      f.start = now;
+      f.fromZoom = currentZoom;
+    }
+
+    return;
+  }
+
+  // =====================================
   // PHASE 1: HERAUSZOOMEN
+  // =====================================
+
   if (f.phase === "out") {
+    const t = progress(
+      CAMOU_ZOOM_OUT_MS
+    );
+
     setZoom(
       lerp(
         f.fromZoom,
         CAMOU_WORLD_OVERVIEW,
-        smooth(elapsed / CAMOU_ZOOM_OUT_MS)
+        t
       )
     );
+
+    if (f.to === "camou") {
+      const scale = lerp(
+        camouSpriteFocusScale(),
+        CAMOU_SPRITE_TRAVEL_SCALE,
+        t
+      );
+
+      camouPlanet.scale.set(
+        scale,
+        scale,
+        1
+      );
+    }
 
     if (elapsed >= CAMOU_ZOOM_OUT_MS) {
       setZoom(CAMOU_WORLD_OVERVIEW);
 
+      globeGroup.visible = false;
+
       f.phase = "turn";
       f.start = now;
-
-      if (f.to === "planet") {
-        globeGroup.visible = false;
-      } else {
-        camouSecondPlanetGroup.visible = false;
-        camouPlanet.visible = true;
-
-        camouPlanet.position.set(0, 0, -25);
-
-        camouPlanet.scale.set(
-          CAMOU_SPRITE_TRAVEL_SCALE,
-          CAMOU_SPRITE_TRAVEL_SCALE,
-          1
-        );
-      }
     }
 
-  // PHASE 2: ZUM ANDEREN PLANETEN
-  } else if (f.phase === "turn") {
-    const t = smooth(
-      elapsed / CAMOU_ROTATE_MS
+    return;
+  }
+
+  // =====================================
+  // PHASE 2: PLANET ZUR MITTE BEWEGEN
+  // =====================================
+
+  if (f.phase === "turn") {
+    const t = progress(
+      CAMOU_ROTATE_MS
     );
 
     const home = camouSpriteHome;
 
     if (home) {
-      const from = f.to === "planet"
-        ? home.position
-        : new THREE.Vector3(0, 0, -25);
+      const center = new THREE.Vector3(
+        0, 0, -25
+      );
 
-      const to = f.to === "planet"
-        ? new THREE.Vector3(0, 0, -25)
-        : home.position;
+      const from =
+        f.to === "planet"
+          ? home.position
+          : center;
+
+      const to =
+        f.to === "planet"
+          ? center
+          : home.position;
 
       camouPlanet.position
         .copy(from)
         .lerp(to, t);
 
-      const fromS = f.to === "planet"
-        ? home.scale.x
-        : CAMOU_SPRITE_TRAVEL_SCALE;
-
-      const toS = f.to === "planet"
-        ? CAMOU_SPRITE_TRAVEL_SCALE
-        : home.scale.x;
-
-      const scale = lerp(fromS, toS, t);
+      const scale =
+        f.to === "planet"
+          ? lerp(
+              home.scale.x,
+              CAMOU_SPRITE_TRAVEL_SCALE,
+              t
+            )
+          : lerp(
+              CAMOU_SPRITE_TRAVEL_SCALE,
+              home.scale.x,
+              t
+            );
 
       camouPlanet.scale.set(
-        scale, scale, 1
+        scale,
+        scale,
+        1
       );
     }
 
-    if (
-      f.to === "camou" &&
-      t > 0.45
-    ) {
-      globeGroup.visible = true;
-    }
-
     sceneNeedsRender = true;
 
-    if (elapsed < CAMOU_ROTATE_MS) return;
+    if (elapsed >= CAMOU_ROTATE_MS) {
+      if (f.to === "camou") {
+        const p = PLACES[f.index];
 
-    if (f.to === "planet") {
-      if (
-        !camouSecondPlanetGroup ||
-        !camouSecondPlanetReady
-      ) return;
+        rotationX = p.lat * RAD;
+        rotationY = -p.lon * RAD;
 
-      globeGroup.visible = false;
-      camouSecondPlanetGroup.visible = true;
-      camouPlanet.visible = false;
+        camera.rotation.z =
+          CAMOU_PANEL_ROLL_DEG[f.index] *
+          RAD;
 
-      rotationX = 0;
-      rotationY = 0;
-      camera.rotation.z = 0;
+        globeGroup.visible = true;
+        camouWorldMode = "camou";
 
-      camouWorldMode = "planet";
+        camouReturnButton.style.display =
+          "none";
 
-      camouReturnButton.style.display =
-        "block";
-
-      navButtons.forEach(button => {
-        button.classList.remove("active");
-      });
-
-      if ($("current-section")) {
-        $("current-section").textContent =
-          "PROJEKT 02";
+        lastIndicatorIndex = -1;
+        camouOriginalIndicator();
+      } else {
+        camera.rotation.z = 0;
       }
 
-      if ($("section-number")) {
-        $("section-number").textContent =
-          "02 / 02";
-      }
-
-    } else {
-      camouSecondPlanetGroup.visible = false;
-      globeGroup.visible = true;
-      camouPlanet.visible = true;
-
-      camouWorldMode = "camou";
-
-      camouReturnButton.style.display =
-        "none";
-
-      const p = PLACES[f.index];
-
-      rotationX = p.lat * RAD;
-      rotationY = -p.lon * RAD;
-
-      camera.rotation.z =
-        CAMOU_PANEL_ROLL_DEG[f.index] * RAD;
-
-      lastIndicatorIndex = -1;
-      updateIndicator();
+      f.phase = "in";
+      f.start = now;
     }
 
-    f.phase = "in";
-    f.start = now;
+    return;
+  }
 
-    sceneNeedsRender = true;
+  // =====================================
+  // PHASE 3: VOLLSTAENDIG HERANZOOMEN
+  // =====================================
 
-  // PHASE 3: HINEINZOOMEN
-  } else if (f.phase === "in") {
+  if (f.phase === "in") {
+    const t = progress(
+      CAMOU_ZOOM_IN_MS
+    );
+
     setZoom(
       lerp(
         CAMOU_WORLD_OVERVIEW,
         CAMOU_WORLD_FOCUS,
-        smooth(elapsed / CAMOU_ZOOM_IN_MS)
+        t
       )
     );
 
+    if (f.to === "planet") {
+      const scale = lerp(
+        CAMOU_SPRITE_TRAVEL_SCALE,
+        camouSpriteFocusScale(),
+        t
+      );
+
+      camouPlanet.scale.set(
+        scale,
+        scale,
+        1
+      );
+    }
+
     if (elapsed >= CAMOU_ZOOM_IN_MS) {
       setZoom(CAMOU_WORLD_FOCUS);
+
+      if (f.to === "camou") {
+        camouRestorePlanetSprite();
+        camouWorldFlight = null;
+      } else {
+        f.phase = "ready";
+        f.start = now;
+      }
+    }
+
+    return;
+  }
+
+  // =====================================
+  // PHASE 4: 3D-PLANET VORBEREITEN
+  // =====================================
+
+  if (f.phase === "ready") {
+    // Auf die fertig erzeugte 3D-Welt warten.
+    if (!camouSecondPlanetGroup) return;
+
+    camouSecondPlanetGroup.visible = true;
+
+    camouSecondPlanetGroup.rotation.set(
+      0, 0, 0
+    );
+
+    rotationX = 0;
+    rotationY = 0;
+
+    camouPlanet.material.opacity = 1;
+    camouSetPlanetSpriteForeground(true);
+
+    f.phase = "surface";
+    f.start = now;
+
+    sceneNeedsRender = true;
+
+    return;
+  }
+
+  // =====================================
+  // PHASE 5: OBERFLAECHE UEBERBLENDEN
+  // =====================================
+
+  if (f.phase === "surface") {
+    const t = progress(
+      CAMOU_WORLD_CROSSFADE_MS
+    );
+
+    // Erst jetzt von der kleinen Darstellung
+    // zur echten 3D-Oberflaeche wechseln.
+    camouPlanet.material.opacity =
+      1 - t;
+
+    sceneNeedsRender = true;
+
+    if (
+      elapsed >= CAMOU_WORLD_CROSSFADE_MS
+    ) {
+      camouPlanet.visible = false;
+
+      camouSetPlanetSpriteForeground(false);
+
+      camouWorldMode = "planet";
+      camouSetSecondProjectInfo();
+
+      if (camouSecondPlanetPanel) {
+        camouSecondPlanetPanel.visible =
+          true;
+
+        camouSecondPlanetPanel.material.opacity =
+          0;
+      }
+
+      f.phase = "reveal";
+      f.start = now;
+    }
+
+    return;
+  }
+
+  // =====================================
+  // PHASE 6: PROJEKTINHALTE EINBLENDEN
+  // =====================================
+
+  if (f.phase === "reveal") {
+    const t = progress(
+      CAMOU_WORLD_REVEAL_MS
+    );
+
+    if (camouSecondPlanetPanel) {
+      camouSecondPlanetPanel.material.opacity =
+        t;
+    }
+
+    sceneNeedsRender = true;
+
+    if (
+      elapsed >= CAMOU_WORLD_REVEAL_MS
+    ) {
       camouWorldFlight = null;
     }
   }
@@ -5341,7 +5674,11 @@ goToSection = function(index) {
 const camouOriginalIndicator = updateIndicator;
 
 updateIndicator = function() {
-  if (camouWorldMode === "planet") return;
+  if (
+    camouWorldMode === "planet" ||
+    camouWorldFlight
+  ) return;
+
   camouOriginalIndicator();
 };
 
