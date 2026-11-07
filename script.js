@@ -5423,23 +5423,32 @@ function camouRestorePlanetSprite() {
   camouSetPlanetSpriteForeground(false);
 }
 
+
 function camouSetSecondProjectInfo() {
+  // Alle Markierungen in der Navigation entfernen.
   navButtons.forEach(button => {
     button.classList.remove("active");
+
+    // Auch die Tastatur-Fokusmarkierung entfernen.
+    if (document.activeElement === button) {
+      button.blur();
+    }
   });
 
-  if ($("current-section")) {
-    $("current-section").textContent =
-      "PROJEKT 02";
+  // Beschriftung unten rechts.
+  const section = $("current-section");
+  const number = $("section-number");
+
+  if (section) {
+    section.textContent = "PLANET";
   }
 
-  if ($("section-number")) {
-    $("section-number").textContent =
-      "02 / 02";
+  if (number) {
+    number.textContent = "01 / 01";
   }
 
-  camouReturnButton.style.display =
-    "block";
+  // Zurueck-Button anzeigen.
+  camouReturnButton.style.display = "block";
 }
 
 /* =========================================
@@ -6021,12 +6030,23 @@ goToSection = function(index) {
 
 const camouOriginalIndicator = updateIndicator;
 
-updateIndicator = function() {
-  if (
-    camouWorldMode === "planet" ||
-    camouWorldFlight
-  ) return;
 
+updateIndicator = function() {
+  // Auf dem Projektplaneten bleibt PLANET aktiv.
+  if (
+    camouWorldMode === "planet" &&
+    !camouWorldFlight
+  ) {
+    camouSetSecondProjectInfo();
+    return;
+  }
+
+  // Waehrend des Hin- und Rueckflugs
+  // keine automatische Anzeige aktualisieren.
+  if (camouWorldFlight) return;
+
+  // Zurueck auf CAMOU:
+  // normale Bereichsanzeige wiederherstellen.
   camouOriginalIndicator();
 };
 
