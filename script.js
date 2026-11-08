@@ -17,7 +17,7 @@ const CONFIG = {
   visualScale: 0.78
 };
 
-const ASSETS = {G
+const ASSETS = {
   home: new URL("./assets/hero.jpg", import.meta.url).href,
   homeVideo: new URL("./assets/test.webm", import.meta.url).href,
   music: new URL("./assets/release.jpg", import.meta.url).href,
@@ -5187,7 +5187,7 @@ function camouDrawSecondProject(ctx, image) {
 
   ctx.font = "400 21px Manrope, Arial";
   ctx.fillText(
-    "Ein neuer Ort fuer Musik, Bilder und Geschichten.",
+    "Ein neuer Ort für Musik, Bilder und Geschichten.",
     0, -185
   );
 
@@ -5217,7 +5217,7 @@ function camouDrawSecondProject(ctx, image) {
   ctx.fillStyle = "#e1dce8";
 
   ctx.fillText(
-    "Hier entsteht das naechste Projekt von b3nn3t.",
+    "Hier entsteht das nächste Projekt von b3nn3t.",
     0, 206
   );
 
