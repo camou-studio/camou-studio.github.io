@@ -17,7 +17,7 @@ const CONFIG = {
   visualScale: 0.78
 };
 
-const ASSETS = {
+const ASSETS = {G
   home: new URL("./assets/hero.jpg", import.meta.url).href,
   homeVideo: new URL("./assets/test.webm", import.meta.url).href,
   music: new URL("./assets/release.jpg", import.meta.url).href,
@@ -69,7 +69,7 @@ const sections = [
     body: [
       "Songs und Spuren, die an",
       "verschiedenen Orten widerhallen.",
-      "Folge Ihnen"
+      "Click & Follow"
     ],
     image: ASSETS.archive
   },
@@ -79,7 +79,7 @@ const sections = [
     title: ["Contact"],
     body: [
       "Für Anfragen und Zusammenarbeit.",
-      "Oder einfach so."
+      "oder einfach so"
     ],
     image: ASSETS.contact
   }
@@ -4948,7 +4948,7 @@ function camouCreatePortal() {
   c.shadowBlur = 14;
   c.fillStyle = "#e6ede5";
 
-  c.fillText("SCHAU REIN  ↗", 0, 0);
+  c.fillText("BEAM ME UP  ↗", 0, 0);
 
   c.shadowBlur = 0;
 
