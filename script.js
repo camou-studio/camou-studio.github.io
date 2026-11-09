@@ -2534,23 +2534,16 @@ async function createGlobeTexture() {
   globeCanvas.width = MAP_W;
   globeCanvas.height = MAP_H;
   globeContext = globeCanvas.getContext("2d");
-
+  
   drawBackground(
     globeContext,
     MAP_W,
     MAP_H
   );
 
-  // Unveränderliche Grundtextur ohne Bilder.
-  baseTextureCanvas = document.createElement("canvas");
-
-  baseTextureCanvas.width = MAP_W;
-  baseTextureCanvas.height = MAP_H;
-
-  baseTextureCanvas
-    .getContext("2d")
-    .drawImage(globeCanvas, 0, 0);
-
+  // CAMOU V2 verwendet eigene Canvas-Texturen
+  // fuer die fuenf Inhaltsbereiche.
+  // Die grosse Sicherheitskopie wird nicht benoetigt.
   images.forEach((image, index) => {
     drawWrappedPanel(
       globeContext,
@@ -2558,8 +2551,7 @@ async function createGlobeTexture() {
       index === 2 ? visualImages[0] : image
     );
   });
-
-  globeTexture = new THREE.CanvasTexture(
+    globeTexture = new THREE.CanvasTexture(
     globeCanvas
   );
 
