@@ -2496,12 +2496,12 @@ function refreshEchoesTexture() {
 ========================================= */
 
 async function createGlobeTexture() {
-
   const canvasFontsReady = document.fonts?.load
     ? Promise.allSettled([
         document.fonts.load("300 58px Manrope"),
         document.fonts.load("400 22px Manrope"),
-        document.fonts.load('500 19px "DM Mono"')
+        document.fonts.load('500 19px "DM Mono"'),
+        document.fonts.load('400 19px "DM Mono"')
       ])
     : Promise.resolve();
 
