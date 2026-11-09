@@ -836,15 +836,10 @@ function drawBackground(ctx, width, height) {
   const image = g.createImageData(512, 256);
 
   // Positionen von VISUALS und ECHOES auf der Kugel
-const centers = [PLACES[2], PLACES[3]].map(p => {
-  const lat = p.lat * RAD;
-
-  return {
-    sinLat: Math.sin(lat),
-    cosLat: Math.cos(lat),
+  const centers = [PLACES[2], PLACES[3]].map(p => ({
+    lat: p.lat * RAD,
     lon: p.lon * RAD
-  };
-});
+  }));
 
   for (let y = 0; y < 256; y++) {
     const v = y / 255;
@@ -940,14 +935,14 @@ const centers = [PLACES[2], PLACES[3]].map(p => {
       let greenInfluence = 0;
 
       for (const center of centers) {
-const dot = clamp(
-  sinLat * center.sinLat +
-  cosLat *
-  center.cosLat *
-  Math.cos(lon - center.lon),
-  -1,
-  1
-);
+        const dot = clamp(
+          sinLat * Math.sin(center.lat) +
+          cosLat *
+          Math.cos(center.lat) *
+          Math.cos(lon - center.lon),
+          -1,
+          1
+        );
 
         const angle = Math.acos(dot);
 
@@ -2534,16 +2529,23 @@ async function createGlobeTexture() {
   globeCanvas.width = MAP_W;
   globeCanvas.height = MAP_H;
   globeContext = globeCanvas.getContext("2d");
-  
+
   drawBackground(
     globeContext,
     MAP_W,
     MAP_H
   );
 
-  // CAMOU V2 verwendet eigene Canvas-Texturen
-  // fuer die fuenf Inhaltsbereiche.
-  // Die grosse Sicherheitskopie wird nicht benoetigt.
+  // Unveränderliche Grundtextur ohne Bilder.
+  baseTextureCanvas = document.createElement("canvas");
+
+  baseTextureCanvas.width = MAP_W;
+  baseTextureCanvas.height = MAP_H;
+
+  baseTextureCanvas
+    .getContext("2d")
+    .drawImage(globeCanvas, 0, 0);
+
   images.forEach((image, index) => {
     drawWrappedPanel(
       globeContext,
@@ -2551,7 +2553,8 @@ async function createGlobeTexture() {
       index === 2 ? visualImages[0] : image
     );
   });
-    globeTexture = new THREE.CanvasTexture(
+
+  globeTexture = new THREE.CanvasTexture(
     globeCanvas
   );
 
