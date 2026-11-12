@@ -36,8 +36,8 @@ const sections = [
   {
     name: "HOME",
     eyebrow: "01 — NEW PROJECT",
-    title: ["c a m o u"],
-    body: ["Gleiche Fragen.", "Neue Perspektiven."],
+    title: ["c a m O u"],
+    body: ["Gleiche Fragen.", "Neuer Cosmos."],
     image: ASSETS.home
   },
   {
