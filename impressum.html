@@ -5,8 +5,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#101411">
-<meta name="description" content="Impressum und Datenschutzerklärung – b3nn3t - Projekt camOu. Rechtliche Angaben gemäss Schweizer Datenschutzgesetz (DSG), Datenverarbeitung und Kontaktmöglichkeiten.">
-<title>Impressum & Datenschutz — Projekt camOu</title>
+<meta name="description" content="Impressum und Datenschutzerklärung – projekt - camOu. Rechtliche Angaben gemäss Schweizer Datenschutzgesetz (DSG), Datenverarbeitung und Kontaktmöglichkeiten.">
+<title>Impressum & Datenschutz — projekt - camOu</title>
 <link rel="canonical" href="https://www.camou.ch/impressum.html">
 
 <!-- Favicons -->
@@ -25,7 +25,8 @@
 <link rel="stylesheet" href="style.css">
 
 <style>
-/* Impressum: gleiche Rahmen-Navigation wie CAMOU */
+/* CAMOU / IMPRESSUM */
+
 html,
 body.legal-page {
   height: 100%;
@@ -37,113 +38,33 @@ body.legal-page {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin: 0;
   overscroll-behavior: none;
-  background: radial-gradient(ellipse at 50% 25%, #29352c 0%, #182019 48%, #101411 90%);
+  background: radial-gradient(
+    ellipse at 50% 25%,
+    #29352c 0%,
+    #182019 48%,
+    #101411 90%
+  );
 }
 
-/* Kopfzeile: links Logo, mittig Menue, rechts Claim */
 .legal-page .topbar {
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  flex: 0 0 102px;
-  box-sizing: border-box;
+  flex: 0 0 76px;
   width: 100%;
-  min-height: 102px;
-  padding: 0 5%;
-  margin: 0;
-  background: #101411;
-  border-bottom: 1px solid rgba(192, 211, 196, .15);
   z-index: 10;
 }
 
-.legal-page .logo {
-  justify-self: start;
-  display: inline-block;
-  font-family: Manrope, Arial, sans-serif;
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -.07em;
-  line-height: 1;
-  color: #f1f1ed;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.legal-page .logo span { color: inherit; }
-
-.legal-page .navigation {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(22px, 2.6vw, 44px);
-  margin: 0;
-}
-
-.legal-page .nav-link {
-  position: relative;
-  padding: 11px 0;
-  font: 500 12px 'DM Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: #9b9e99;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.legal-page .nav-link:hover,
-.legal-page .nav-link.active { color: #f0f2eb; }
-
-.legal-page .nav-link.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: #abbeb0;
-}
-
-.legal-page .top-note {
-  justify-self: end;
-  margin: 0;
-  font: 500 11px 'DM Mono', monospace;
-  letter-spacing: .12em;
-  color: #aaaea6;
-  white-space: nowrap;
-}
-
-/* Der Scrollbereich reicht bis ganz an den rechten Browserrand. */
-.legal-page .legal-main {
+.legal-main {
   flex: 1 1 auto;
   min-height: 0;
-  box-sizing: border-box;
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none;
-}
-
-.legal-page .legal-main::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Edge */
-  width: 0;
-  height: 0;
-}
-
-.legal-content {
-  box-sizing: border-box;
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
   padding: 38px 26px 45px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .legal-kicker {
@@ -165,88 +86,138 @@ body.legal-page {
   padding: 25px 0 29px;
 }
 
-.legal-main h2 { font-size: 21px; font-weight: 500; margin: 0 0 18px; }
-.legal-main h3 { font-size: 15px; font-weight: 600; margin: 25px 0 12px; }
-.legal-main p, .legal-main li {
+.legal-main h2 {
+  font-size: 21px;
+  font-weight: 500;
+  margin: 0 0 18px;
+}
+
+.legal-main h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 25px 0 12px;
+}
+
+.legal-main p,
+.legal-main li {
   font-size: 14px;
   line-height: 1.8;
   color: #d1d9cd;
   margin: 0 0 14px;
 }
-.legal-main strong { color: var(--fg, #f0f2eb); }
-.legal-main ul { padding-left: 22px; margin-bottom: 16px; }
-.legal-main a { color: #c6d8bd; text-underline-offset: 3px; overflow-wrap: anywhere; }
-.legal-main a:hover { color: #fff; }
 
-/* Footer wie auf der Hauptseite: Impressum links, Claim rechts. */
+.legal-main strong {
+  color: var(--fg, #f0f2eb);
+}
+
+.legal-main ul {
+  padding-left: 22px;
+  margin-bottom: 16px;
+}
+
+.legal-main a {
+  color: #c6d8bd;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.legal-main a:hover {
+  color: #fff;
+}
+
 .legal-page .footer {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 0 0 74px;
-  box-sizing: border-box;
+  flex: 0 0 62px;
   width: 100%;
-  min-height: 74px;
-  margin: 0;
-  padding: 0 5%;
-  background: #101411;
-  border-top: 1px solid rgba(192, 211, 196, .15);
+  min-height: 62px;
   z-index: 10;
 }
 
-.legal-page .footer a,
-.legal-page .footer span {
-  color: #a5ada4;
-  font: 500 11px 'DM Mono', monospace;
-  letter-spacing: .12em;
-  text-decoration: none;
+.legal-page .footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
 }
 
-.legal-page .footer a:hover { color: #f0f2eb; }
-
-@media (max-width: 900px) {
-  .legal-page .topbar { padding: 0 4%; }
-  .legal-page .navigation { gap: 17px; }
-  .legal-page .top-note { font-size: 9px; }
+.legal-page .nav-link {
+  text-decoration: none;
 }
 
 @media (max-width: 700px) {
   .legal-page .topbar {
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    row-gap: 6px;
-    flex-basis: 94px;
-    min-height: 94px;
-    padding: 10px 20px;
+    flex-basis: 82px;
   }
-  .legal-page .logo { font-size: 22px; }
-  .legal-page .top-note { font-size: 9px; }
-  .legal-page .navigation {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: space-between;
-    gap: 8px;
-    width: 100%;
+
+  .legal-page .footer {
+    flex-basis: 54px;
+    min-height: 54px;
+    padding: 12px 20px;
+    gap: 12px;
   }
-  .legal-page .nav-link { font-size: 9px; letter-spacing: .02em; padding: 5px 0; }
-  .legal-content { padding: 24px 20px 30px; }
-  .legal-main p, .legal-main li { font-size: 13px; }
-  .legal-page .footer { flex-basis: 62px; min-height: 62px; padding: 10px 20px; }
-  .legal-page .footer a, .legal-page .footer span { font-size: 9px; letter-spacing: .03em; }
+
+  .legal-main {
+    padding: 24px 20px 30px;
+  }
+
+  .legal-main p,
+  .legal-main li {
+    font-size: 13px;
+  }
 }
 </style>
 </head>
 
 <body class="legal-page">
 
-INDEPENDENT ARTIST
+<!-- HEADER: identisch zur Hauptseite -->
+<header class="topbar">
+
+  <a
+    class="logo"
+    href="index.html"
+    id="logo"
+  >
+    camOu<span>.</span>
+  </a>
+
+  <!-- NAVIGATION -->
+  <nav
+    class="navigation"
+    aria-label="Hauptnavigation"
+  >
+
+    <a class="nav-link" href="index.html">
+      Home
+    </a>
+
+    <a class="nav-link" href="index.html#music">
+      Music
+    </a>
+
+    <a class="nav-link" href="index.html#visuals">
+      Visuals
+    </a>
+
+    <a class="nav-link" href="index.html#echoes">
+      Echoes
+    </a>
+
+    <a class="nav-link" href="index.html#contact">
+      Contact
+    </a>
+
+  </nav>
+
+  <div class="top-note">
+    INDEPENDENT ARTIST
+  </div>
+
+</header>
 
 <main class="legal-main">
-  <div class="legal-content">
 
   <div class="legal-kicker">
-    Projekt camOu / RECHTLICHES
+    camOu / RECHTLICHES
   </div>
 
   <h1>Impressum &amp;<br>Datenschutz</h1>
@@ -267,8 +238,8 @@ INDEPENDENT ARTIST
     <p>
       <strong>Kontakt:</strong><br>
       E-Mail:
-      <a href="mailto:kontakt@b3nn3t.com">
-        kontakt@b3nn3t.com
+      <a href="mailto:kontakt@b3nn3t.ch">
+        kontakt@b3nn3t.ch
       </a>
     </p>
   </section>
@@ -298,8 +269,8 @@ INDEPENDENT ARTIST
     <p>
       <strong>Bennet Kohnke</strong><br>
       Kontakt:
-      <a href="mailto:kontakt@b3nn3t.com">
-        kontakt@b3nn3t.com
+      <a href="mailto:kontakt@b3nn3t.ch">
+        kontakt@b3nn3t.ch
       </a>
     </p>
 
@@ -343,8 +314,8 @@ INDEPENDENT ARTIST
     <p>
       Die Formular-Daten werden über Google Apps Script
       verarbeitet und per E-Mail an
-      <a href="mailto:kontakt@b3nn3t.com">
-        kontakt@b3nn3t.com
+      <a href="mailto:kontakt@b3nn3t.ch">
+        kontakt@camou.ch
       </a>
       weitergeleitet. Bei der Nutzung des Kontaktformulars
       wird die Einwilligung zur Datenbearbeitung über
@@ -454,7 +425,7 @@ INDEPENDENT ARTIST
       Ich behalte mir vor, diese Datenschutzerklärung
       gelegentlich anzupassen.
       Diese Erklärung wurde im November 2026
-      für das Projekt camOu angepasst.
+      für camOu angepasst.
     </p>
   </section>
 
@@ -479,12 +450,20 @@ INDEPENDENT ARTIST
     </p>
   </section>
 
-  </div>
 </main>
 
 <footer class="footer">
-  <a href="impressum.html" aria-current="page">Impressum</a>
-  <span>b3nn3t - independent artist</span>
+  <span>
+    b3nn3t — independent artist
+  </span>
+
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="mailto:kontakt@camou.ch">Contact ↗</a>
+    <a href="impressum.html" aria-current="page">
+      Impressum
+    </a>
+  </div>
 </footer>
 
 </body>
