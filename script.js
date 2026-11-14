@@ -5365,7 +5365,7 @@ function camouDrawSecondProject(ctx, image) {
   ctx.fillStyle = "rgba(220,216,236,.78)";
 
   ctx.fillText(
-    "ZURUECK: NAVIGATION ODER BUTTON",
+    "ZURÜCK: NAVIGATION ODER BUTTON",
     0, 265
   );
 
@@ -5493,7 +5493,7 @@ const camouReturnButton =
 
 camouReturnButton.type = "button";
 camouReturnButton.textContent =
-  "← ZURUECK ZU CAMOU";
+  "← ZURÜCK ZU camOu";
 
 camouReturnButton.setAttribute(
   "aria-label",
