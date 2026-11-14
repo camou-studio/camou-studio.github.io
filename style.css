@@ -621,23 +621,33 @@ a {
 /* Desktop: Zoom-Bedienung stets vor dem WebGL-Canvas. */
 .zoom-controls { z-index: 40; pointer-events: auto; }
 .zoom-controls button { position: relative; pointer-events: auto; touch-action: manipulation; }
-/* CAMOU – Navigation und Footer beim 3D-Zoom sichtbar halten */
+/* CAMOU – Navigationsleisten über der 3D-Kugel halten */
 @media (min-width: 701px) {
+  .experience {
+    position: relative;
+    isolation: isolate;
+  }
 
   .topbar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: 100;
   }
 
   .footer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1000;
+    position: absolute;
+    inset: auto 0 0 0;
+    z-index: 100;
+  }
+
+  .globe-stage {
+    z-index: 1;
+  }
+
+  .topbar,
+  .footer {
+    pointer-events: auto;
   }
 
 }
+
