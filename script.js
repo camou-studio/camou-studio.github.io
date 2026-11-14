@@ -1,7 +1,7 @@
 
 import * as THREE from "three";
 
-/* CAMOU – EXPLORE GLOBE
+/* camOu – EXPLORE GLOBE
    Five freely positioned environments
    Navigation / Video / Visuals / Compass / Modals
 */
@@ -119,7 +119,7 @@ const navButtons = [
 ];
 
 const mobile = window.matchMedia(
-  "(max-width:700px)"
+  "(hover: none) and (pointer: coarse)"
 ).matches;
 
 const defaultZoom = mobile
@@ -6350,3 +6350,240 @@ handleGlobeClick = function(event) {
 camouCreatePortal();
 
 /* ENDE CAMOU PROJEKTPLANET 02 */
+
+
+/* ============================================================
+   CAMOU – TRACKLIST + COUNTDOWN
+   Zusaetzliche freie Flaechen auf der oberen/unteren Kugelseite
+============================================================ */
+
+const CAMOU_TRACKS_PLACE = {
+  lon: 72,
+  lat: 48,
+  tiltR: -13 * RAD
+};
+
+const CAMOU_COUNTDOWN_PLACE = {
+  lon: 72,
+  lat: -43,
+  tiltR: 8 * RAD
+};
+
+function camouCreateOverlayCanvas(place) {
+  const canvas = document.createElement("canvas");
+  canvas.width = CAMOU_V2_W;
+  canvas.height = CAMOU_V2_H;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.min(
+    renderer.capabilities.getMaxAnisotropy(),
+    4
+  );
+
+  const mesh = new THREE.Mesh(
+    camouV2Geometry(place),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    })
+  );
+
+  mesh.renderOrder = 3;
+  globeGroup.add(mesh);
+
+  return { canvas, texture, mesh };
+}
+
+const camouTracksOverlay = camouCreateOverlayCanvas(CAMOU_TRACKS_PLACE);
+const camouCountdownOverlay = camouCreateOverlayCanvas(CAMOU_COUNTDOWN_PLACE);
+
+function camouDrawTracklist() {
+  const { canvas, texture } = camouTracksOverlay;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.textBaseline = "middle";
+
+  // Unruhiger, handgezeichneter Orbit als visuelle Klammer.
+  ctx.save();
+  ctx.strokeStyle = "rgba(224,235,220,.36)";
+  ctx.lineWidth = 1.4;
+  ctx.setLineDash([3, 10, 18, 6]);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 350, 270, -0.24, -0.12, Math.PI * 1.83);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = "rgba(224,235,220,.22)";
+  ctx.beginPath();
+  ctx.ellipse(10, -2, 285, 205, 0.34, 0.25, Math.PI * 1.78);
+  ctx.stroke();
+  ctx.restore();
+
+  // Kleine Stern-/Kreuzmarken, bewusst unregelmaessig verteilt.
+  const marks = [
+    [-365, -220, 9], [330, -270, 7], [375, 115, 10],
+    [-330, 260, 7], [35, -315, 8], [180, 290, 6],
+    [-70, 285, 5]
+  ];
+  for (const [x, y, size] of marks) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(0.4);
+    ctx.strokeStyle = "rgba(230,239,226,.72)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-size, 0);
+    ctx.lineTo(size, 0);
+    ctx.moveTo(0, -size);
+    ctx.lineTo(0, size);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(224,235,220,.68)";
+  ctx.font = "500 17px 'DM Mono', monospace";
+  ctx.save();
+  ctx.translate(-8, -18);
+  ctx.rotate(-0.08);
+  ctx.fillText("TRACKS / FRAGMENTE", 0, 0);
+  ctx.restore();
+
+  const tracks = [
+    { n: "3", title: "verstand gg. Leib", x: -205, y: -175, r: -0.10, size: 29 },
+    { n: "2", title: "mfg", x: 70, y: -255, r: 0.13, size: 35 },
+    { n: "7", title: "SCHOTTER", x: 250, y: -145, r: -0.16, size: 31 },
+    { n: "5", title: "06:00, 06:05, 06:10, 06:15…", x: 245, y: 55, r: 0.08, size: 18 },
+    { n: "8", title: "suchtbedingt (outro)", x: 105, y: 235, r: -0.11, size: 24 },
+    { n: "", title: "wie die jungs", x: -145, y: 235, r: 0.12, size: 27 },
+    { n: "1", title: "sanktgallen (intro)", x: -280, y: 35, r: -0.17, size: 23 },
+    { n: "6", title: "moerder", x: -20, y: 80, r: 0.06, size: 33 }
+  ];
+
+  for (const track of tracks) {
+    ctx.save();
+    ctx.translate(track.x, track.y);
+    ctx.rotate(track.r);
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(204,220,202,.72)";
+    ctx.font = "500 15px 'DM Mono', monospace";
+    if (track.n) ctx.fillText(track.n.padStart(2, "0"), -8, -21);
+
+    ctx.fillStyle = "#F2F0E8";
+    ctx.font = `500 ${track.size}px Manrope, Arial, sans-serif`;
+    ctx.shadowColor = "rgba(0,0,0,.48)";
+    ctx.shadowBlur = 9;
+    ctx.fillText(track.title, 18, 0, 430);
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = "rgba(219,233,216,.45)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(18, 17);
+    ctx.lineTo(Math.min(245, 26 + track.title.length * track.size * 0.34), 17);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Kleine handschriftliche Akzentlinie.
+  ctx.save();
+  ctx.translate(5, 5);
+  ctx.rotate(-0.18);
+  ctx.strokeStyle = "rgba(230,239,225,.58)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-70, -5);
+  ctx.bezierCurveTo(-15, -24, 28, 20, 88, -8);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+  texture.needsUpdate = true;
+  sceneNeedsRender = true;
+}
+
+const CAMOU_COUNTDOWN_TARGET = new Date(2026, 10, 27, 0, 0, 0, 0);
+
+function camouDrawCountdown() {
+  const { canvas, texture } = camouCountdownOverlay;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  const remaining = Math.max(0, CAMOU_COUNTDOWN_TARGET.getTime() - Date.now());
+
+  const totalSeconds = Math.floor(remaining / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // Offene, technische Rahmung statt einer geschlossenen Box.
+  ctx.strokeStyle = "rgba(224,236,222,.52)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-300, -150);
+  ctx.lineTo(-235, -150);
+  ctx.moveTo(235, -150);
+  ctx.lineTo(300, -150);
+  ctx.moveTo(-300, 150);
+  ctx.lineTo(-235, 150);
+  ctx.moveTo(235, 150);
+  ctx.lineTo(300, 150);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(221,234,218,.72)";
+  ctx.font = "500 18px 'DM Mono', monospace";
+  ctx.fillText("COUNTDOWN  /  NEXT TRANSMISSION", 0, -104);
+
+  ctx.fillStyle = "#F4F1E8";
+  ctx.shadowColor = "rgba(0,0,0,.48)";
+  ctx.shadowBlur = 12;
+  ctx.font = "300 112px Manrope, Arial, sans-serif";
+  ctx.fillText(String(days).padStart(2, "0"), 0, 8);
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = "rgba(226,237,222,.82)";
+  ctx.font = "500 20px 'DM Mono', monospace";
+  ctx.fillText("TAGE", 0, 67);
+
+  ctx.fillStyle = "#F4F1E8";
+  ctx.font = "500 30px 'DM Mono', monospace";
+  ctx.fillText(
+    `${String(hours).padStart(2, "0")} : ${String(minutes).padStart(2, "0")} : ${String(seconds).padStart(2, "0")}`,
+    0,
+    112
+  );
+
+  ctx.fillStyle = "rgba(221,234,218,.70)";
+  ctx.font = "500 17px 'DM Mono', monospace";
+  ctx.fillText("27 . 11 . 2026", 0, 174);
+
+  ctx.restore();
+  texture.needsUpdate = true;
+  sceneNeedsRender = true;
+}
+
+camouDrawTracklist();
+camouDrawCountdown();
+
+// Nur die Countdown-Flaeche wird sekundenweise neu gezeichnet.
+const camouCountdownTimer = window.setInterval(
+  camouDrawCountdown,
+  1000
+);
+
+/* ENDE CAMOU – TRACKLIST + COUNTDOWN */
