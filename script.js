@@ -3072,7 +3072,7 @@ if (data.get("website")) {
 
       if (contactStatus) {
         contactStatus.textContent =
-          "Übertragung abgeschlossen. Empfang nicht bestätigt.";
+          "Nachricht gesendet. Ich danke dir.";
       }
     } catch (error) {
       console.error(
