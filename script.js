@@ -3047,8 +3047,21 @@ contactForm?.addEventListener(
 
     const data = new FormData(contactForm);
 
-    data.set("privacy", "on");
-    data.set("website", "");
+// Honeypot prüfen
+if (data.get("website")) {
+  if (contactStatus) {
+    contactStatus.textContent =
+      "Senden nicht möglich.";
+  }
+
+  contactSending = false;
+
+  if (contactSubmit) {
+    contactSubmit.disabled = false;
+  }
+
+  return;
+}
 
     try {
       await fetch(CONTACT_SCRIPT_URL, {
