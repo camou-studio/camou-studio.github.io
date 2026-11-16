@@ -346,7 +346,22 @@
                 maxlength="1200"
                 required
               ></textarea>
-            </label>
+                        </label>
+
+            <!-- HONEYPOT / SPAM-SCHUTZ -->
+            <div
+              style="position:absolute; left:-9999px; height:0; overflow:hidden;"
+              aria-hidden="true"
+            >
+              <label for="contact-website">Website</label>
+              <input
+                id="contact-website"
+                name="website"
+                type="text"
+                tabindex="-1"
+                autocomplete="off"
+              >
+            </div>
 
             <!-- DATENSCHUTZ -->
             <label class="contact-privacy">
