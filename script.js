@@ -19,7 +19,7 @@ const CONFIG = {
 
 const ASSETS = {
   home: new URL("./assets/hero.jpg", import.meta.url).href,
-  homeVideo: new URL("./assets/test.webm", import.meta.url).href,
+  homeVideo: new URL("./assets/test.mp4", import.meta.url).href,
   music: new URL("./assets/release.jpg", import.meta.url).href,
   visuals: new URL("./assets/visuals.jpg", import.meta.url).href,
   visualSlides: [
