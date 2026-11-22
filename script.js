@@ -77,7 +77,7 @@ const sections = [
     eyebrow: "04 — HALL",
     title: ["echo"],
     body: [
-      "du entscheidest wo mein",
+      "du entschiedest wo mein",
       "echo zu hoeren ist"
     ],
     image: ASSETS.archive
@@ -897,7 +897,8 @@ const CAMOU_PANEL_ROLL_DEG = [0, -90, 180, 0, 20];
 const PHOTO_W = 440;
 const PHOTO_H = 320;
 const PHOTO_Y = 136;
-const COMPASS_Y = 115;
+// Compass sits higher to leave room for its text BELOW the dial.
+const COMPASS_Y = -20;
 
 /*
   lon: Längengrad
@@ -1050,7 +1051,7 @@ homeVideo.src = ASSETS.homeVideo;
 homeVideo.loop = true;
 homeVideo.playsInline = true;
 homeVideo.preload = "none";
-homeVideo.volume = 1;
+homeVideo.volume = 0.65; // 35 % leiser als bisher (100 %)
 
 let homeVideoStarted = false;
 let homeVideoPlaying = false;
@@ -1570,7 +1571,8 @@ function sensorMode() {
 }
 
 const SENSOR_CONTROL = {
-  y: COMPASS_Y + 207,
+  // Independently positioned underneath the new two-line Echo caption.
+  y: 322,
   checkboxX: -109,
   labelX: -85,
   hitLeft: -130,
@@ -2120,6 +2122,55 @@ ctx.stroke();
    ANALOGER DIA-BETRACHTER
 ========================================= */
 
+// Rounded / oval CRT glass rather than a rectangular LCD-style mask.
+// n ~ 2.8 gives softly squared, curved sides like a period tube television.
+function camouCRTScreenPath(ctx, x, y, w, h) {
+  const exponent = 2 / 2.8;
+  const steps = 96;
+  ctx.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const a = i * Math.PI * 2 / steps;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const px = x + w * .5 + w * .5 * Math.sign(ca) * Math.pow(Math.abs(ca), exponent);
+    const py = y + h * .5 + h * .5 * Math.sign(sa) * Math.pow(Math.abs(sa), exponent);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+// Render thin horizontal slices with mild barrel distortion: edges taper
+// slightly, while the centre fills the CRT screen. All slides use the same
+// transform, and the glass path clips every slice to the oval screen.
+function camouCRTDrawWarpedImage(ctx, image, x, y, w, h) {
+  const iw = image?.videoWidth || image?.naturalWidth || image?.width;
+  const ih = image?.videoHeight || image?.naturalHeight || image?.height;
+  if (!iw || !ih) return;
+
+  const scale = Math.max(w / iw, h / ih);
+  const cropW = Math.min(iw, w / scale);
+  const cropH = Math.min(ih, h / scale);
+  const cropX = (iw - cropW) * .5;
+  const cropY = (ih - cropH) * .5;
+
+  const slices = Math.ceil(h / 2.5);
+  for (let i = 0; i < slices; i++) {
+    const start = i / slices;
+    const end = (i + 1) / slices;
+    const mid = (start + end) * .5;
+    const towardEnds = Math.abs(mid * 2 - 1);
+    const squeezedW = w * (1 - .085 * towardEnds * towardEnds);
+    const destX = x + (w - squeezedW) * .5;
+    const destY = y + h * start;
+    const destH = h * (end - start) + .65; // overlapping rows, no black seams
+    const srcY = cropY + cropH * start;
+    const srcH = Math.min(ih - srcY, cropH * (end - start) + .35);
+    ctx.drawImage(image, cropX, srcY, cropW, srcH,
+      destX, destY, squeezedW, destH);
+  }
+}
+
 function drawVisualViewer(ctx, cx, iy, iw, ih) {
   const image = visualImages[visualIndex];
 
@@ -2129,11 +2180,11 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   const bodyX = cx - bodyW / 2;
   const bodyY = iy - 50;
 
-  const windowX = cx - iw / 2 + 13;
-  const windowY = iy + 13;
+  const windowX = cx - iw / 2 + 17;
+  const windowY = iy + 8;
 
-  const windowW = iw - 26;
-  const windowH = ih - 26;
+  const windowW = iw - 34;
+  const windowH = ih - 16;
 
   ctx.save();
   ctx.shadowColor = "rgba(30,36,41,.36)";
@@ -2245,15 +2296,8 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.fillStyle = frameGradient;
 
-  ctx.beginPath();
-  ctx.roundRect(
-    windowX - 13,
-    windowY - 13,
-    windowW + 26,
-    windowH + 26,
-    14
-  );
-
+  camouCRTScreenPath(ctx,
+    windowX - 13, windowY - 13, windowW + 26, windowH + 26);
   ctx.fill();
 
   ctx.strokeStyle = "rgba(252,252,252,.78)";
@@ -2261,9 +2305,9 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ctx.stroke();
 
   // Gedunkelte CRT-Dichtung direkt zwischen Bild und Metall.
-  ctx.fillStyle = "rgba(45,50,55,.76)";
-  ctx.beginPath();
-  ctx.roundRect(windowX - 5, windowY - 5, windowW + 10, windowH + 10, 9);
+  ctx.fillStyle = "rgba(45,50,55,.82)";
+  camouCRTScreenPath(ctx,
+    windowX - 6, windowY - 6, windowW + 12, windowH + 12);
   ctx.fill();
 
   // Dezente vertikale Lueftungsschlitze an der rechten TV-Seite.
@@ -2298,26 +2342,12 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ctx.stroke();
 
   ctx.save();
-  ctx.beginPath();
-
-  ctx.roundRect(
-    windowX,
-    windowY,
-    windowW,
-    windowH,
-    5
-  );
-
+  camouCRTScreenPath(ctx, windowX, windowY, windowW, windowH);
   ctx.clip();
 
   if (image) {
-    cover(
-      ctx,
-      image,
-      windowX,
-      windowY,
-      windowW,
-      windowH
+    camouCRTDrawWarpedImage(
+      ctx, image, windowX, windowY, windowW, windowH
     );
   } else {
     ctx.fillStyle = "#43494D";
@@ -2355,6 +2385,14 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     windowH
   );
 
+  ctx.restore();
+
+  // The innermost glass rim follows the bowed tube outline.
+  ctx.save();
+  camouCRTScreenPath(ctx, windowX, windowY, windowW, windowH);
+  ctx.strokeStyle = "rgba(235,238,239,.34)";
+  ctx.lineWidth = 1.35;
+  ctx.stroke();
   ctx.restore();
 
   // Die alte CAMOU / VIEWER-Beschriftung entfaellt.
@@ -5133,7 +5171,10 @@ drawPanel = function(ctx, index, image) {
 
 const titleY = index === 3 ? -262 : -217;
 const titleX = -12;
-ctx.fillText(section.title[0], titleX, titleY, 820);
+// Echo deliberately has no title on the globe; menu label stays "echo".
+if (index !== 3) {
+  ctx.fillText(section.title[0], titleX, titleY, 820);
+}
 
 if (index === 1 || index === 4) {
   // FRAGMENTE und CONTACT: Der jeweilige Titel ersetzt die Bild-Verlinkung.
@@ -5156,7 +5197,16 @@ if (index === 1 || index === 4) {
 
   ctx.fillStyle = "rgba(252,252,252,.97)";
 
-  if (index === 1) {
+  if (index === 3) {
+    // Echo: the entire sentence is placed BELOW the raised compass.
+    // The sensor switch remains independent, below the caption.
+    ctx.font = "400 23px Manrope, Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    section.body.forEach((line, i) => {
+      ctx.fillText(line, p.imageX, 211 + i * 36, 690);
+    });
+  } else if (index === 1) {
     // FRAGMENTE: Gedicht nochmals weiter unten als in v5; groessere Schrift.
     // Die schmalere, um 90 Grad gedrehte Spalte behaelt Sicherheitsabstand
     // zum unteren Rand der gekruemmten Inhaltsflaeche (auch mobil).
@@ -5219,7 +5269,7 @@ if (index === 1 || index === 4) {
     drawCompass(
       ctx,
       p.imageX,
-      112
+      COMPASS_Y
     );
 
     ctx.save();
@@ -5793,60 +5843,56 @@ function camouCreateRockyWorldTexture() {
 ========================================= */
 
 function camouDrawSecondPlanetScatteredText(ctx, width, height) {
-  // Jede Schrift erscheint genau einmal, aber an einer eigenen Position.
-  // Die Ausgangspunkte sind gleichmaessig ueber 360 Grad verteilt; die
-  // kleine, reproduzierbare Zufallsabweichung macht die Anordnung organisch.
-  // Relativ zum Planeten jetzt etwa halb so gross wie in v5.
-  // Die vier Orte und ihre leicht zufaelligen Neigungen bleiben erhalten.
-  const fragments = [
-    { text: "mach kein auge", u: .24, v: .33, size: 13.5, width: 138, tilt: -.11 },
-    { text: "detaillreiche qualität braucht seine zeit ja", u: .49, v: .71, size: 11.5, width: 171, tilt: .10 },
-    { text: "der nächste planet wird angesteuert!", u: .73, v: .29, size: 12, width: 174, tilt: -.07 },
-    { text: "mal sehen wo der wind mich hinweht >.<", u: .94, v: .70, size: 11.5, width: 168, tilt: .13 }
+  // Only this one phrase is used; no older four text fragments remain.
+  // The coordinates and small jitter form a repeatable, irregular pattern.
+  const phrase = "mal sehen wo der wind mich hinweht >.<";
+  const places = [
+    { u: .09, v: .20, angle: -.09 },
+    { u: .42, v: .12, angle:  .07 },
+    { u: .76, v: .26, angle: -.10 },
+    { u: .24, v: .42, angle:  .12 },
+    { u: .60, v: .49, angle: -.05 },
+    { u: .94, v: .53, angle:  .08 },
+    { u: .10, v: .73, angle: -.09 },
+    { u: .45, v: .82, angle:  .05 },
+    { u: .79, v: .78, angle: -.07 }
   ];
 
-  let randomSeed = 0xC42026;
+  let seed = 0xC42027;
   const jitter = () => {
-    randomSeed = (Math.imul(randomSeed, 1664525) + 1013904223) >>> 0;
-    return randomSeed / 4294967296 - .5;
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296 - .5;
   };
 
-  const scale = width / 768;
   ctx.save();
-  ctx.textBaseline = "middle";
   ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
+  const fontSize = width * .0091;  // 14 px at 1536: intentionally tiny
+  ctx.font = `500 ${fontSize}px Manrope, Arial, sans-serif`;
+  const textWidth = width * .19;
 
-  for (const fragment of fragments) {
-    const x = (fragment.u + jitter() * .025) * width;
-    const y = (fragment.v + jitter() * .032) * height;
-    const angle = fragment.tilt + jitter() * .04;
-    const fontSize = fragment.size * scale;
-    const maxWidth = fragment.width * scale;
-    ctx.font = `500 ${fontSize}px Manrope, Arial, sans-serif`;
-    const lines = camouWrapParagraph(ctx, fragment.text, maxWidth);
-    const leading = fontSize * 1.27;
+  for (const place of places) {
+    const x = (place.u + jitter() * .022) * width;
+    const y = (place.v + jitter() * .024) * height;
+    const angle = place.angle + jitter() * .05;
 
-    // An der 0/360-Grad-Naht wird der Schriftblock gespiegelt gezeichnet,
-    // damit kein Wort bei der Umdrehung abrupt abbricht.
-    for (const wrapX of [-width, 0, width]) {
+    // Horizontal seam repetition ensures continuous text as the sphere rotates.
+    for (const offset of [-width, 0, width]) {
       ctx.save();
-      ctx.translate(x + wrapX, y);
+      ctx.translate(x + offset, y);
       ctx.rotate(angle);
-      ctx.fillStyle = "rgba(252,252,252,.96)";
-      ctx.strokeStyle = "rgba(65,39,53,.38)";
-      ctx.lineWidth = 0.55 * scale;
-      ctx.shadowColor = "rgba(53,34,45,.27)";
-      ctx.shadowBlur = 2.4 * scale;
-
-      lines.forEach((line, i) => {
-        const baseline = (i - (lines.length - 1) / 2) * leading;
-        ctx.strokeText(line, 0, baseline, maxWidth);
-        ctx.fillText(line, 0, baseline, maxWidth);
-      });
+      ctx.fillStyle = "rgba(252,252,252,.92)";
+      ctx.strokeStyle = "rgba(63,39,51,.38)";
+      ctx.lineWidth = Math.max(.45, width * .00034);
+      ctx.shadowColor = "rgba(53,34,45,.18)";
+      ctx.shadowBlur = Math.max(.8, width * .00095);
+      ctx.strokeText(phrase, 0, 0, textWidth);
+      ctx.fillText(phrase, 0, 0, textWidth);
       ctx.restore();
     }
   }
+
   ctx.restore();
 }
 
