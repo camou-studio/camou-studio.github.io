@@ -131,10 +131,11 @@ const navButtons = [
    Es werden ausschliesslich Hintergruende gesetzt.
 ========================================= */
 const CAMOU_MENU_BACKGROUND = [
-  "radial-gradient(ellipse 31% 170% at 12% 15%, rgba(255,255,255,.30) 0%, rgba(255,255,255,.07) 48%, transparent 90%)",
-  "radial-gradient(ellipse 36% 190% at 58% 115%, rgba(255,255,255,.25) 0%, rgba(255,255,255,.06) 52%, transparent 96%)",
-  "radial-gradient(ellipse 27% 200% at 93% 7%, rgba(255,255,255,.17) 0%, transparent 92%)",
-  "linear-gradient(110deg, #abaeb1 0%, #b5b8ba 29%, #a7aaad 60%, #abaeb1 100%)"
+  // Sanfte, unregelmaessige Aufhellungen, darunter das gedeckte Rosa #E37383.
+  "radial-gradient(ellipse 33% 190% at 9% -12%, rgba(255,255,255,.39) 0%, rgba(255,255,255,.14) 49%, transparent 95%)",
+  "radial-gradient(ellipse 31% 210% at 54% 120%, rgba(255,255,255,.31) 0%, rgba(255,255,255,.08) 53%, transparent 100%)",
+  "radial-gradient(ellipse 25% 220% at 95% 5%, rgba(255,255,255,.27) 0%, transparent 90%)",
+  "linear-gradient(108deg, #E37383 0%, #EB8D9B 26%, #E77C8B 58%, #F0A0AA 82%, #E37383 100%)"
 ].join(", ");
 
 function camouSetMenuBackground(bar) {
@@ -154,6 +155,24 @@ function camouFindBarFrom(element, atTop) {
   return null;
 }
 
+// Das alleinstehende PROJECT-Label oben rechts entfernen, nicht
+// die Navigation oder Projekttexte auf dem Globus.
+function camouRemoveTopProjectLabel(header) {
+  const bar = header || camouFindBarFrom($("logo"), true);
+  if (!bar) return;
+
+  for (const node of bar.querySelectorAll("a, button, span, small, p, div")) {
+    if (node.children.length && !node.matches("a, button")) continue;
+    if (node.textContent.trim().toLowerCase() !== "project") continue;
+
+    const rect = node.getBoundingClientRect();
+    if (rect.top < -5 || rect.top > 175 || rect.left < window.innerWidth * .65) continue;
+
+    const label = node.closest("a, button") || node;
+    label.remove();
+  }
+}
+
 function camouApplyMenuBackgrounds() {
   const header = document.querySelector(
     "body > header, header.site-header, .site-header, .topbar, .top-bar, .header-bar, #site-header"
@@ -169,6 +188,7 @@ function camouApplyMenuBackgrounds() {
 
   camouSetMenuBackground(header);
   camouSetMenuBackground(footer);
+  camouRemoveTopProjectLabel(header);
 }
 
 camouApplyMenuBackgrounds();
@@ -257,6 +277,53 @@ function camouCreateUsedPaperTexture() {
   ctx.bezierCurveTo(w * .74, h * .77, w * .86, h * .85, w * .96, h * .81);
   ctx.stroke();
   ctx.restore();
+
+  // Wie verwischte Pastell- oder Kreidespuren auf benutztetem Papier:
+  // einzelne transparente Haarlinien, Aussetzer und lose Pigmentkoerner.
+  // Feste Startzahl, damit bei jedem Laden das gleiche Bild erscheint.
+  let wearSeed = 0x521AC0;
+  const wearRandom = () => {
+    wearSeed = (Math.imul(wearSeed, 1664525) + 1013904223) >>> 0;
+    return wearSeed / 4294967296;
+  };
+
+  const wearAreas = [
+    { x: .15, y: .30, spreadX: .20, spreadY: .10, angle: -.28, rgb: "214,220,226", opacity: .12 },
+    { x: .79, y: .17, spreadX: .21, spreadY: .09, angle:  .42, rgb: "168,205,244", opacity: .11 },
+    { x: .70, y: .84, spreadX: .25, spreadY: .08, angle: -.16, rgb: "237,237,222", opacity: .16 },
+    { x: .26, y: .82, spreadX: .15, spreadY: .08, angle:  .20, rgb: "247,247,215", opacity: .13 },
+    { x: .59, y: .46, spreadX: .12, spreadY: .07, angle: -.55, rgb: "214,220,226", opacity: .08 }
+  ];
+
+  for (const area of wearAreas) {
+    ctx.save();
+    ctx.translate(area.x * w, area.y * h);
+    ctx.rotate(area.angle);
+    ctx.lineCap = "round";
+    for (let k = 0; k < 82; k++) {
+      const sx = (wearRandom() - .5) * area.spreadX * w * 2;
+      const sy = (wearRandom() - .5) * area.spreadY * h * 2;
+      const length = 4 + wearRandom() * 47;
+      const dy = (wearRandom() - .5) * 8;
+      ctx.strokeStyle = `rgba(${area.rgb},${area.opacity * (.15 + wearRandom() * .75)})`;
+      ctx.lineWidth = .4 + wearRandom() * 2.3;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.quadraticCurveTo(sx + length * .5, sy + dy * 1.8, sx + length, sy + dy);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Winzige, unregelmaessige Papierfasern; keine grossen sichtbaren Punkte.
+  const dustTones = ["214,220,226", "237,237,222", "168,205,244", "247,247,215"];
+  for (let k = 0; k < 2100; k++) {
+    const px = wearRandom() * w;
+    const py = wearRandom() * h;
+    const shade = dustTones[Math.floor(wearRandom() * dustTones.length)];
+    ctx.fillStyle = `rgba(${shade},${.035 + wearRandom() * .10})`;
+    ctx.fillRect(px, py, .3 + wearRandom() * 2.2, .3 + wearRandom() * 1.1);
+  }
 
   // Reproduzierbares, sehr feines Papierkorn (kein animiertes Rauschen).
   const image = ctx.getImageData(0, 0, w, h);
@@ -1484,13 +1551,24 @@ function drawCompass(ctx, cx, cy) {
     185
   );
 
-  gradient.addColorStop(0, "#EFF9FA");
-  gradient.addColorStop(0.7, "#A4D0D6");
-  gradient.addColorStop(1, "#76AAB6");
+  // Minecraft-Kompass als leise Referenz: silbriger Aussenring,
+  // darunter ein mattes Anthrazit-Zifferblatt, ohne Pixel-Look.
+  gradient.addColorStop(0, "#E0E1DF");
+  gradient.addColorStop(0.54, "#ABB1B5");
+  gradient.addColorStop(1, "#717A80");
 
   ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.arc(cx, cy, 174, 0, Math.PI * 2);
+  ctx.fill();
+
+  const dial = ctx.createRadialGradient(cx - 30, cy - 42, 12, cx, cy, 165);
+  dial.addColorStop(0, "#535B60");
+  dial.addColorStop(.62, "#41494E");
+  dial.addColorStop(1, "#30383D");
+  ctx.fillStyle = dial;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 156, 0, Math.PI * 2);
   ctx.fill();
 
 
@@ -1500,28 +1578,17 @@ function drawCompass(ctx, cx, cy) {
     cx + 174, cy + 174
   );
 
-  rimMetal.addColorStop(
-    0, "rgba(252,252,252,.60)"
-  );
-
-  rimMetal.addColorStop(
-    0.32, "rgba(220,239,243,.85)"
-  );
-
-  rimMetal.addColorStop(
-    0.68, "rgba(136,200,200,.57)"
-  );
-
-  rimMetal.addColorStop(
-    1, "rgba(252,252,252,.64)"
-  );
+  rimMetal.addColorStop(0, "rgba(250,249,247,.77)");
+  rimMetal.addColorStop(.32, "rgba(228,230,230,.92)");
+  rimMetal.addColorStop(.68, "rgba(133,140,144,.79)");
+  rimMetal.addColorStop(1, "rgba(249,249,247,.73)");
 
   ctx.strokeStyle = rimMetal;
   ctx.lineWidth = 1.3;
   ctx.stroke();
 
   // Schmale dunkle Fuge zwischen Gehaeuse und Glas.
-  ctx.strokeStyle = "rgba(86,147,163,.54)";
+  ctx.strokeStyle = "rgba(52,60,65,.62)";
   ctx.lineWidth = 2;
 
   ctx.beginPath();
@@ -1529,7 +1596,7 @@ function drawCompass(ctx, cx, cy) {
   ctx.stroke();
 
   // Zurueckhaltender innerer Rand.
-  ctx.strokeStyle = "rgba(252,252,252,.31)";
+  ctx.strokeStyle = "rgba(230,233,232,.26)";
   ctx.lineWidth = 0.8;
 
   ctx.beginPath();
@@ -1562,14 +1629,14 @@ function drawCompass(ctx, cx, cy) {
     );
 
     ctx.strokeStyle = major
-      ? "rgba(252,252,252,.96)"
-      : "rgba(252,252,252,.62)";
+      ? "rgba(240,241,239,.73)"
+      : "rgba(232,235,235,.43)";
 
     ctx.lineWidth = major ? 1.8 : 0.8;
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "rgba(38,86,93,.23)";
+  ctx.strokeStyle = "rgba(226,230,230,.16)";
   ctx.lineWidth = 1;
 
   for (let i = 0; i < 8; i++) {
@@ -1596,19 +1663,19 @@ function drawCompass(ctx, cx, cy) {
   ctx.rotate(needleAngle);
 
   // Sehr weicher Schatten unter der Nadel.
-  ctx.shadowColor = "rgba(0,0,0,.55)";
+  ctx.shadowColor = "rgba(0,0,0,.30)";
   ctx.shadowBlur = 5;
   ctx.shadowOffsetX = 2;
   ctx.shadowOffsetY = 2;
 
-  // Rosafarbene Spitze mit dezenter seitlicher Schattierung.
+  // Sanftes, entsaettigtes Rot statt knalliger Minecraft-Pixelfarbe.
   const redMetal = ctx.createLinearGradient(
     -12, 0, 12, 0
   );
 
-  redMetal.addColorStop(0, "#9BC7D1");
-  redMetal.addColorStop(0.42, "#ECF8FA");
-  redMetal.addColorStop(1, "#B5D9DF");
+  redMetal.addColorStop(0, "#A75F69");
+  redMetal.addColorStop(0.42, "#D89A9F");
+  redMetal.addColorStop(1, "#B86D76");
 
   ctx.fillStyle = redMetal;
 
@@ -1620,14 +1687,14 @@ function drawCompass(ctx, cx, cy) {
   ctx.closePath();
   ctx.fill();
 
-  // Helle Spitze: warmes Metall statt flaches Weiss.
+  // Gegenseite: helles Silber mit weicher Grauschattierung.
   const paleMetal = ctx.createLinearGradient(
     -12, 0, 12, 0
   );
 
-  paleMetal.addColorStop(0, "#86BAC6");
-  paleMetal.addColorStop(0.45, "#D8EDF1");
-  paleMetal.addColorStop(1, "#FCFCFC");
+  paleMetal.addColorStop(0, "#818B90");
+  paleMetal.addColorStop(0.45, "#C9CED0");
+  paleMetal.addColorStop(1, "#F2F1EE");
 
   ctx.fillStyle = paleMetal;
 
@@ -1678,7 +1745,7 @@ function drawCompass(ctx, cx, cy) {
 
   glass.addColorStop(
     1,
-    "rgba(38,86,93,.19)"
+    "rgba(29,36,42,.18)"
   );
 
   ctx.fillStyle = glass;
@@ -1721,22 +1788,22 @@ function drawCompass(ctx, cx, cy) {
 
     buttonGlass.addColorStop(
       0,
-      "#F1FAFA"
+      "#F3F3F0"
     );
 
     buttonGlass.addColorStop(
       0.22,
-      "#B9DEE2"
+      "#C6CCCE"
     );
 
     buttonGlass.addColorStop(
       0.58,
-      "#97C3CC"
+      "#9BA6AB"
     );
 
     buttonGlass.addColorStop(
       1,
-      "#689EAC"
+      "#737F87"
     );
 
     ctx.fillStyle = buttonGlass;
@@ -1792,7 +1859,7 @@ ctx.stroke();
     ctx.restore();
   }
 
-  ctx.fillStyle = "#81B5C1";
+  ctx.fillStyle = "#9DA7AA";
   ctx.strokeStyle = "#FCFCFC";
   ctx.lineWidth = 2;
 
@@ -1801,7 +1868,7 @@ ctx.stroke();
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = "#F5FBFC";
+  ctx.fillStyle = "#F1F2F0";
   ctx.beginPath();
   ctx.arc(cx, cy, 3, 0, Math.PI * 2);
   ctx.fill();
@@ -1829,7 +1896,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   const windowH = ih - 26;
 
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,.65)";
+  ctx.shadowColor = "rgba(30,36,41,.36)";
   ctx.shadowBlur = 28;
   ctx.shadowOffsetY = 13;
 
@@ -1840,11 +1907,12 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     bodyY + bodyH
   );
 
-  bodyGradient.addColorStop(0, "#EBF7F8");
-  bodyGradient.addColorStop(0.18, "#C1E2E5");
-  bodyGradient.addColorStop(0.55, "#8DBDC7");
-  bodyGradient.addColorStop(0.82, "#A9D4DA");
-  bodyGradient.addColorStop(1, "#73A4B0");
+  // Mattes, leicht gealtertes TV-Silber statt tuerkisem Gehaeuse.
+  bodyGradient.addColorStop(0, "#F0F0ED");
+  bodyGradient.addColorStop(.18, "#D2D5D5");
+  bodyGradient.addColorStop(.55, "#9FA6AA");
+  bodyGradient.addColorStop(.82, "#BFC4C6");
+  bodyGradient.addColorStop(1, "#7D858C");
 
   ctx.fillStyle = bodyGradient;
   ctx.beginPath();
@@ -1858,7 +1926,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.save();
 
-  ctx.strokeStyle = "rgba(252,252,252,.83)";
+  ctx.strokeStyle = "rgba(252,252,250,.80)";
   ctx.lineWidth = 3;
 
   ctx.beginPath();
@@ -1867,7 +1935,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   );
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(0,0,0,.65)";
+  ctx.strokeStyle = "rgba(63,69,73,.63)";
   ctx.lineWidth = 2;
 
   ctx.beginPath();
@@ -1908,7 +1976,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ];
 
   for (const [sx, sy] of screws) {
-    ctx.fillStyle = "#2C606B";
+    ctx.fillStyle = "#646D74";
     ctx.beginPath();
     ctx.arc(sx, sy, 6, 0, Math.PI * 2);
     ctx.fill();
@@ -1931,9 +1999,9 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     windowY + windowH
   );
 
-  frameGradient.addColorStop(0, "#86B4BE");
-  frameGradient.addColorStop(0.5, "#DCF1F3");
-  frameGradient.addColorStop(1, "#86B4BE");
+  frameGradient.addColorStop(0, "#69747B");
+  frameGradient.addColorStop(.5, "#E7E9E8");
+  frameGradient.addColorStop(1, "#868E94");
 
   ctx.fillStyle = frameGradient;
 
@@ -1950,6 +2018,43 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.strokeStyle = "rgba(252,252,252,.78)";
   ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Gedunkelte CRT-Dichtung direkt zwischen Bild und Metall.
+  ctx.fillStyle = "rgba(45,50,55,.76)";
+  ctx.beginPath();
+  ctx.roundRect(windowX - 5, windowY - 5, windowW + 10, windowH + 10, 9);
+  ctx.fill();
+
+  // Dezente vertikale Lueftungsschlitze an der rechten TV-Seite.
+  ctx.save();
+  ctx.lineCap = "round";
+  for (let slot = 0; slot < 7; slot++) {
+    const x = windowX + windowW + 18;
+    const y = windowY + 42 + slot * 14;
+    ctx.strokeStyle = "rgba(63,70,77,.36)";
+    ctx.lineWidth = 2.1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 10, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Kleiner versenkter Einstellknopf (der aktive Dia-Hebel bleibt frei).
+  const tuningX = windowX + windowW + 25;
+  const tuningY = windowY + windowH - 38;
+  ctx.fillStyle = "#788188";
+  ctx.beginPath();
+  ctx.arc(tuningX, tuningY, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(248,248,247,.76)";
+  ctx.lineWidth = 1.3;
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(54,61,68,.75)";
+  ctx.beginPath();
+  ctx.moveTo(tuningX, tuningY - 4);
+  ctx.lineTo(tuningX, tuningY + 2);
   ctx.stroke();
 
   ctx.save();
@@ -1975,7 +2080,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
       windowH
     );
   } else {
-    ctx.fillStyle = "#2E6972";
+    ctx.fillStyle = "#43494D";
     ctx.fillRect(
       windowX,
       windowY,
@@ -2012,7 +2117,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.restore();
 
-  ctx.fillStyle = "rgba(252,252,252,.92)";
+  ctx.fillStyle = "rgba(61,66,71,.88)";
   ctx.font = "bold 15px 'DM Mono', monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -2038,9 +2143,9 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     0
   );
 
-  railGradient.addColorStop(0, "#7CACB6");
-  railGradient.addColorStop(0.5, "#E1F1F4");
-  railGradient.addColorStop(1, "#7EAEBB");
+  railGradient.addColorStop(0, "#7F898D");
+  railGradient.addColorStop(.5, "#E3E7E7");
+  railGradient.addColorStop(1, "#828B91");
 
   ctx.fillStyle = railGradient;
   ctx.beginPath();
@@ -2065,9 +2170,9 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     0
   );
 
-  rodGradient.addColorStop(0, "#8CBAC4");
-  rodGradient.addColorStop(0.45, "#FCFCFC");
-  rodGradient.addColorStop(1, "#B5D8DF");
+  rodGradient.addColorStop(0, "#8A9498");
+  rodGradient.addColorStop(.45, "#F4F4F1");
+  rodGradient.addColorStop(1, "#B7BDC0");
 
   ctx.strokeStyle = rodGradient;
   ctx.lineWidth = 9;
@@ -2087,10 +2192,10 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     23
   );
 
-  knobGradient.addColorStop(0, "#FCFCFC");
-  knobGradient.addColorStop(0.35, "#C8E6E9");
-  knobGradient.addColorStop(0.75, "#9BC9D1");
-  knobGradient.addColorStop(1, "#6E9EAA");
+  knobGradient.addColorStop(0, "#FAFAF8");
+  knobGradient.addColorStop(.35, "#DADEDF");
+  knobGradient.addColorStop(.75, "#ADB5BA");
+  knobGradient.addColorStop(1, "#747F86");
 
   ctx.fillStyle = knobGradient;
   ctx.beginPath();
@@ -2104,9 +2209,9 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   // Dezente PRESS-Markierung.
   ctx.save();
 
-  ctx.shadowColor = "rgba(205,237,241,.55)";
+  ctx.shadowColor = "rgba(226,228,227,.40)";
   ctx.shadowBlur = 16;
-  ctx.strokeStyle = "#E2F1F3";
+  ctx.strokeStyle = "#E8E9E8";
   ctx.lineWidth = 2.5;
 
   ctx.beginPath();
@@ -2119,7 +2224,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ctx.font = "700 15px 'DM Mono', monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#26565D";
+  ctx.fillStyle = "#414A50";
 
   ctx.fillText(
     "PRESS",
@@ -4307,6 +4412,7 @@ const CAMOU_V2_W = 960;
 const CAMOU_V2_H = 760;
 const CAMOU_V2_SCALE = mobile ? 0.00222 : 0.00296;
 const CAMOU_MOBILE_SIDE_SCALE = 0.80;
+const CAMOU_HOME_VIDEO_SCALE = mobile ? 1.10 : 1.20;
 
 const CAMOU_V2_CANVASES = [];
 const CAMOU_V2_TEXTURES = [];
@@ -4547,7 +4653,10 @@ paintPhoto = function(ctx, index, image) {
 
   ctx.save();
   ctx.translate(p.imageX, photoY);
-  if (mobile && index === 1) {
+  if (index === 0) {
+    // Groessere HOME-Videoflaeche; MUSIC und CONTACT bleiben unveraendert.
+    ctx.scale(CAMOU_HOME_VIDEO_SCALE, CAMOU_HOME_VIDEO_SCALE);
+  } else if (mobile && index === 1) {
     ctx.scale(CAMOU_MOBILE_SIDE_SCALE, CAMOU_MOBILE_SIDE_SCALE);
   }
   ctx.rotate(p.photoR);
@@ -5029,8 +5138,9 @@ photoPoint = function(point, index) {
   const s = Math.sin(p.photoR);
 
   // Skalierung der Bilder auf Smartphones
-  const scale =
-    mobile && (index === 1 || index === 4)
+  const scale = index === 0
+    ? CAMOU_HOME_VIDEO_SCALE
+    : mobile && (index === 1 || index === 4)
       ? CAMOU_MOBILE_SIDE_SCALE
       : 1;
 
@@ -6586,20 +6696,6 @@ function camouDrawCountdown() {
   ctx.translate(w / 2, h / 2);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-
-  // Offene, technische Rahmung statt einer geschlossenen Box.
-  ctx.strokeStyle = "rgba(38,86,93,.58)";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(-300, -150);
-  ctx.lineTo(-235, -150);
-  ctx.moveTo(235, -150);
-  ctx.lineTo(300, -150);
-  ctx.moveTo(-300, 150);
-  ctx.lineTo(-235, 150);
-  ctx.moveTo(235, 150);
-  ctx.lineTo(300, 150);
-  ctx.stroke();
 
   ctx.fillStyle = "rgba(38,86,93,.88)";
   ctx.font = "500 18px 'DM Mono', monospace";
