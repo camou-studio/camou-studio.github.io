@@ -1,3 +1,38 @@
+Benutzeranhang
+an sich gefällt mir grundsätzlich was du gemacht hast, ich würde gerne noch ein paar detaills anpassen... HINTERGRUND: bis jetzt ist er nur weiss, aber ich möchte das es einwenig organischer wirkt und mehr wie benutztes papier wirkt.. dementsprechend kannst du auch ein paar gebrauchspuren von leicht sehbaren verschmierungen in den farben (#ededde , #f7f7d7 ,#a8cdf4 ,#d6dce2 ) machen... GLOBUS: der globus ist mir momentan noch zu einheitlich hellblau.. bitte mach es einwenig organischer mit ein paar etwas dunkleren organischen fecken und mehr von den gelben und rosa tönen auf dem globus verteilt.. die elemente auf dem globus wie der compass usw. dürfen gerne ein bisschen steriler hellblau mit weiss gemischt sein.. MENU: mach das overlaymenu oben und unten farblich #abaeb1 mit bisschen weiss gemischt und möglichst organisch.. die schriften usw sollen natürlich gleich bleiben! ZWEITER PLANET: er soll die rosa farbe andeuten aber nicht zu hell sein. auf dem zweiten planeten soll das bild weg und nurnoch der text stehen... CONTACT: hier soll das bild ebenfalls weg und quasi der contact text selber soll als hyperlink sein damit man zum kontaktformular kommt.. das heisst den text Contact neu unterstreichen und ein kleinen pfeil dahinter einfügen damit es ersichlich ist das es ein hyperlink ist.. TRACKS / FRAGMENTE: beim titel ''wie die jungs'' fehlt die zahl 5.. diese bitte ergänzen bei den anderen tracks jeweils von 01, 02, 03 usw zu 1, 2, 3 usw abändern, macht mehr sinn.
+bitte sorgfälltig den letzten code überarbeiten und mir den neuen nochmal zum kopieren fertig machen
+…
+3m 40s nachgedacht
+
+Die neue Version für deine camOu-Globus-Seite ist fertig. Ich habe den bisherigen JavaScript-Code vollständig übernommen und die gewünschten Änderungen eingearbeitet.
+
+camOu – aktualisierter vollständiger Code
+
+6'709 Zeilen · JavaScript · Syntaxprüfung bestanden
+
+JavaScript-Datei herunterladen
+Was ich geändert habe
+
+    Universum: Papierweisser Hintergrund mit dezenten organischen Verschmierungen in #ededde, #f7f7d7, #a8cdf4 und #d6dce2, ergänzt durch feine Körnung.
+
+    Hauptglobus: Mehr unregelmässige dunkeltürkise Flächen sowie sichtbarer verteilte gelbe und rosa Pigmentflecken.
+
+    Kompass und Dia-Betrachter: Etwas hellere, sauberere Türkis-Weiss-Abstufungen.
+
+    Menü oben und unten: Grauton #abaeb1 mit weichen weisslichen Verläufen. Die Schriftformatierungen bleiben unverändert.
+
+    Zweiter Planet: Dunkles, gedämpftes Altrosa statt Violettgrau. Das Bild wurde entfernt, die Texte bleiben erhalten.
+
+    Contact: Kein Bild mehr. Der zentrierte und unterstrichene Titel Contact ↗ öffnet beim Anklicken das bestehende Kontaktformular.
+
+    Tracks / Fragmente: «wie die jungs» trägt jetzt die Nummer 5, «06:00, 06:05, 06:10, 06:15…» die Nummer 4. Alle Tracknummern erscheinen ohne führende Null.
+
+Navigation, Zoom, Kameraflüge, Videofunktionen und die übrigen Interaktionen habe ich nicht absichtlich verändert.
+
+Prüfung: Die JavaScript-Syntax sowie die wichtigsten Änderungen und Tracknummern sind kontrolliert. Eine vollständige visuelle Browserprüfung war ohne die zugehörigen HTML-, CSS- und Asset-Dateien nicht möglich. Die Menüfarben werden deshalb über ergänzte CSS-Regeln im JavaScript angewendet; bei abweichenden HTML-Klassennamen kann eine kleine Anpassung erforderlich sein.
+
+Du kannst den bisherigen JavaScript-Code vollständig durch die neue Version ersetzen.
+camOu_aktualisiert_Papier_Globus_Contact.jsCode
 
 import * as THREE from "three";
 
@@ -24,7 +59,9 @@ const CAMOU_THEME = Object.freeze({
   yellow: "#C0C47A",
   pink: "#E9C3CE",
   paper: "#FCFCFC",
-  ink: "#26565D"
+  ink: "#26565D",
+  menu: "#abaeb1",
+  paperStains: ["#ededde", "#f7f7d7", "#a8cdf4", "#d6dce2"]
 });
 
 const ASSETS = {
@@ -143,8 +180,172 @@ for (const id of [
   document.getElementById(id)?.remove();
 }
 
+/* =========================================
+   GEBRAUCHTES PAPIER / UNIVERSUM
+   Die Struktur liegt HINTER den beiden Kugeln.
+========================================= */
+
+function camouCreatePaperUniverseTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 768;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = CAMOU_THEME.paper;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Lichtflecken und Verfaerbungen mit stark aufgeweichten Kanten.
+  const smears = [
+    [0.08, 0.16, 0.33, 0.24, "#ededde", 0.45, -0.27],
+    [0.73, 0.13, 0.31, 0.28, "#f7f7d7", 0.42,  0.25],
+    [0.95, 0.58, 0.36, 0.27, "#d6dce2", 0.35, -0.49],
+    [0.27, 0.77, 0.29, 0.36, "#a8cdf4", 0.23,  0.43],
+    [0.64, 0.90, 0.37, 0.19, "#ededde", 0.40,  0.17],
+    [0.45, 0.45, 0.19, 0.29, "#f7f7d7", 0.22, -0.72],
+    [0.86, 0.37, 0.15, 0.34, "#a8cdf4", 0.13,  0.61]
+  ];
+
+  for (const [u, v, rx, ry, color, alpha, angle] of smears) {
+    ctx.save();
+    ctx.translate(u * canvas.width, v * canvas.height);
+    ctx.rotate(angle);
+    ctx.scale(rx * canvas.width, ry * canvas.height);
+
+    const halo = ctx.createRadialGradient(0, 0, 0.03, 0, 0, 1);
+    halo.addColorStop(0, color);
+    halo.addColorStop(0.25, color);
+    halo.addColorStop(1, "rgba(252,252,252,0)");
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Unaufdringliche, unregelmaessige Farbschlieren statt Kreismuster.
+  const trails = [
+    ["#d6dce2", 0.16, 0.08, 0.36, 0.24, 0.53, 0.20, 23],
+    ["#ededde", 0.71, 0.05, 0.52, 0.35, 0.82, 0.54, 32],
+    ["#f7f7d7", 0.02, 0.71, 0.28, 0.63, 0.45, 0.87, 30],
+    ["#a8cdf4", 0.57, 0.81, 0.81, 0.67, 0.97, 0.74, 20],
+    ["#d6dce2", 0.39, 0.52, 0.51, 0.64, 0.65, 0.49, 18]
+  ];
+
+  for (const [color, x1, y1, cx, cy, x2, y2, width] of trails) {
+    ctx.save();
+    ctx.globalAlpha = 0.17;
+    ctx.filter = "blur(18px)";
+    ctx.lineCap = "round";
+    ctx.lineWidth = width;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x1 * canvas.width, y1 * canvas.height);
+    ctx.quadraticCurveTo(
+      cx * canvas.width, cy * canvas.height,
+      x2 * canvas.width, y2 * canvas.height
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Papierkoernung und einzelne feine Gebrauchsspuren.
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const bytes = pixels.data;
+  let seed = 192822;
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+
+  for (let i = 0; i < bytes.length; i += 4) {
+    const grain = (random() - 0.5) * 5.0;
+    bytes[i] = clamp(bytes[i] + grain, 0, 255);
+    bytes[i + 1] = clamp(bytes[i + 1] + grain, 0, 255);
+    bytes[i + 2] = clamp(bytes[i + 2] + grain, 0, 255);
+  }
+  ctx.putImageData(pixels, 0, 0);
+
+  for (let i = 0; i < 115; i++) {
+    const x = random() * canvas.width;
+    const y = random() * canvas.height;
+    const length = 3 + random() * 35;
+    const slope = (random() - 0.5) * 18;
+    ctx.strokeStyle = CAMOU_THEME.paperStains[i % 4];
+    ctx.globalAlpha = 0.025 + random() * 0.06;
+    ctx.lineWidth = 0.4 + random() * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + length * 0.5, y + slope, x + length, y + slope * 0.5);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/* =========================================
+   MENUE-LEISTEN OBEN UND UNTEN
+   Ausschliesslich Hintergrund, keine Schriftveraenderung.
+========================================= */
+
+function camouApplyMenuPalette() {
+  if (document.getElementById("camou-menu-color-theme")) return;
+
+  const style = document.createElement("style");
+  style.id = "camou-menu-color-theme";
+  style.textContent = `
+    .camou-paper-menu,
+    .site-header, .site-footer,
+    .main-header, .main-footer,
+    .topbar, .bottombar,
+    .top-bar, .bottom-bar,
+    .site-top, .site-bottom,
+    .header, .footer,
+    .status-bar, .statusbar, .bottom-info,
+    header, footer {
+      background-color: #abaeb1 !important;
+      background-image:
+        radial-gradient(ellipse 48% 160% at 12% 24%, rgba(252,252,252,.35), transparent 82%),
+        radial-gradient(ellipse 42% 160% at 84% 75%, rgba(252,252,252,.22), transparent 83%),
+        radial-gradient(ellipse 28% 130% at 55% 20%, rgba(214,220,226,.32), transparent 82%),
+        linear-gradient(115deg, #abaeb1, #b9bbbe 42%, #abaeb1 79%, #b4b7ba) !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Die zwei breiten Balken auch dann treffen, wenn das Projekt
+  // dafuer eigene, unbekannte CSS-Klassennamen verwendet.
+  const findHorizontalBar = element => {
+    let node = element;
+    const widthThreshold = window.innerWidth * 0.67;
+    while (node && node !== document.body) {
+      const rect = node.getBoundingClientRect();
+      if (
+        rect.width >= widthThreshold &&
+        rect.height >= 30 &&
+        rect.height <= 155
+      ) return node;
+      node = node.parentElement;
+    }
+    return null;
+  };
+
+  const topBar = findHorizontalBar(navButtons[0]);
+  const bottomBar = findHorizontalBar(
+    document.getElementById("current-section") ||
+    document.getElementById("section-number")
+  );
+  topBar?.classList.add("camou-paper-menu");
+  bottomBar?.classList.add("camou-paper-menu");
+}
+
+camouApplyMenuPalette();
+
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(CAMOU_THEME.paper);
+scene.background = camouCreatePaperUniverseTexture();
 // Dieselbe Papierfarbe auch vor dem ersten WebGL-Frame zeigen.
 stage.style.backgroundColor = CAMOU_THEME.paper;
 container.style.backgroundColor = CAMOU_THEME.paper;
@@ -813,102 +1014,104 @@ function playButton(ctx, x, y) {
 }
 
 /* =========================================
-   ORGANISCHER HINTERGRUND
+   ORGANISCHE HAUPTKUGEL: AQUA / GELB / ROSA
 ========================================= */
-
 
 function drawBackground(ctx, width, height) {
   const small = document.createElement("canvas");
-  small.width = 512;
-  small.height = 256;
+  small.width = 768;
+  small.height = 384;
 
   const g = small.getContext("2d");
   const image = g.createImageData(small.width, small.height);
   const data = image.data;
 
-  // Helle Aqua-Grundierung mit mehrfach ineinanderlaufenden,
-  // unregelmaessigen Farbwolken wie auf dem camOu-Cover.
-  // Der Verlauf bleibt an der horizontalen Kante anschlussfaehig.
-  const aqua = [136, 200, 200]; // #88C8C8
-  const deepAqua = [89, 157, 171];
-  const blueAqua = [111, 179, 192];
-  const yellow = [192, 196, 122]; // #C0C47A
-  const pink = [233, 195, 206];   // #E9C3CE
-  const paper = [252, 252, 252];  // #FCFCFC
+  const aqua = [136, 200, 200];
+  const blueAqua = [101, 176, 191];
+  const deepAqua = [67, 139, 155];
+  const yellow = [192, 196, 122];
+  const pink = [233, 195, 206];
+  const paper = [252, 252, 252];
 
-  const blend = (c1, c2, amount) => {
-    const t = clamp(amount, 0, 1);
+  const mix = (a, b, t) => {
+    const amount = clamp(t, 0, 1);
     return [
-      lerp(c1[0], c2[0], t),
-      lerp(c1[1], c2[1], t),
-      lerp(c1[2], c2[2], t)
+      lerp(a[0], b[0], amount),
+      lerp(a[1], b[1], amount),
+      lerp(a[2], b[2], amount)
     ];
   };
 
-  const cloud = (u, v, cx, cy, rx, ry) => {
+  // Periodischer Abstand: keine sichtbare Naht auf der Kugel.
+  const cloud = (u, v, cx, cy, rx, ry, w) => {
     const dx = Math.abs(u - cx);
     const wrappedX = Math.min(dx, 1 - dx) / rx;
     const dy = (v - cy) / ry;
-    return 1 - smooth(Math.hypot(wrappedX, dy));
+    const distance = Math.hypot(wrappedX, dy);
+    return 1 - smooth((distance - 0.10 + w) / 0.92);
   };
 
   for (let y = 0; y < small.height; y++) {
     const v = (y + 0.5) / small.height;
-
     for (let x = 0; x < small.width; x++) {
       const u = (x + 0.5) / small.width;
-      const phase = 2 * Math.PI * u;
+      const t = 2 * Math.PI * u;
 
-      // Drei Frequenzen ergeben organische, leicht gekritzelte
-      // Farbverlaeufe statt geometrischer Kreisflecken.
-      const broad = Math.sin(
-        phase * 2 + Math.sin(v * 7.8) * 1.2 + v * 5.2
-      );
-      const middle = Math.cos(
-        phase * 4 - Math.sin(v * 11.3) * 1.0 - v * 8.1
-      );
-      const fine = Math.sin(
-        phase * 10 + v * 32 + Math.cos(phase * 3) * 1.2
-      );
-      const flow = broad * 0.51 + middle * 0.33 + fine * 0.16;
-      const warpU = u + 0.031 * Math.sin(v * 16 + broad * 1.2);
-      const warpV = v + 0.038 * Math.cos(phase * 3 + middle);
+      // Gekruemmte Pigmentstroeme in verschiedenen Groessen.
+      const broad = Math.sin(2 * t + v * 7.1 + 0.8 * Math.sin(v * 8.6));
+      const medium = Math.cos(5 * t - v * 12.9 + 0.7 * Math.sin(2 * t));
+      const detail = Math.sin(12 * t + v * 29.0 + 1.3 * Math.cos(3 * t));
+      const flow = broad * 0.52 + medium * 0.33 + detail * 0.15;
 
-      // Sanft wechselnde Blau-/Tuerkisabstufungen.
-      let color = blend(aqua, deepAqua,
-        0.10 + 0.25 * (0.5 + 0.5 * broad) + 0.12 * Math.abs(flow)
-      );
-      color = blend(color, blueAqua,
-        0.11 + 0.24 * (0.5 + 0.5 * middle)
+      const warpedU = u + 0.025 * Math.sin(v * 14.3 + medium);
+      const warpedV = v + 0.048 * Math.sin(3 * t + broad * 0.7);
+      const edge = Math.sin(v * 19 + 3 * t + medium) * 0.08;
+
+      let color = mix(aqua, blueAqua,
+        0.12 + 0.21 * (0.5 + 0.5 * medium)
       );
 
-      // Gelb als kleine, weich verlaufende Akzentzonen.
-      const yellowInfluence = (
-        cloud(warpU, warpV, 0.84, 0.72, 0.24, 0.36) * 0.48 +
-        cloud(warpU, warpV, 0.25, 0.35, 0.19, 0.25) * 0.30
-      ) * (0.84 + 0.16 * flow);
-      color = blend(color, yellow, yellowInfluence);
-
-      // Ein deutlich kleinerer, unregelmaessiger Rosa-Anteil.
-      const pinkInfluence = (
-        cloud(warpU, warpV, 0.62, 0.57, 0.15, 0.24) * 0.30 +
-        cloud(warpU, warpV, 0.08, 0.18, 0.11, 0.15) * 0.13
-      ) * (0.83 + 0.17 * middle);
-      color = blend(color, pink, pinkInfluence);
-
-      // Vereinzelte helle Papier-Aufhellungen, nie eine
-      // deckende weisse Kugeloberflaeche.
-      const paperInfluence = (
-        cloud(warpU, warpV, 0.43, 0.15, 0.27, 0.25) * 0.22 +
-        cloud(warpU, warpV, 0.03, 0.82, 0.20, 0.30) * 0.16
+      // Ein paar deutlich dunklere, asymmetrische Aqua-Flecken.
+      const darkZones =
+        0.87 * cloud(warpedU, warpedV, 0.10, 0.42, 0.21, 0.30, edge) +
+        0.88 * cloud(warpedU, warpedV, 0.54, 0.72, 0.19, 0.23, -edge) +
+        0.66 * cloud(warpedU, warpedV, 0.79, 0.18, 0.14, 0.22, edge) +
+        0.42 * cloud(warpedU, warpedV, 0.38, 0.21, 0.14, 0.16, -edge);
+      color = mix(color, deepAqua,
+        clamp(darkZones * (0.78 + 0.22 * flow), 0, 0.82)
       );
-      color = blend(color, paper, paperInfluence);
 
-      // Dezente Pigmentkoernung; die Grundform bleibt weich.
+      // Gelbe Flecken sind ueber die Kugel verteilt und nicht kreisrund.
+      const yellowZones =
+        0.80 * cloud(warpedU, warpedV, 0.25, 0.39, 0.16, 0.18, -edge) +
+        0.82 * cloud(warpedU, warpedV, 0.65, 0.27, 0.18, 0.26, edge) +
+        0.70 * cloud(warpedU, warpedV, 0.92, 0.64, 0.15, 0.23, -edge) +
+        0.47 * cloud(warpedU, warpedV, 0.45, 0.87, 0.17, 0.17, edge);
+      color = mix(color, yellow,
+        clamp(yellowZones * (0.90 + 0.10 * medium), 0, 0.82)
+      );
+
+      // Rosa deutlich sichtbar, aber kleiner als Gelb und Tuerkis.
+      const pinkZones =
+        0.63 * cloud(warpedU, warpedV, 0.48, 0.46, 0.14, 0.21, edge) +
+        0.66 * cloud(warpedU, warpedV, 0.83, 0.82, 0.14, 0.18, -edge) +
+        0.44 * cloud(warpedU, warpedV, 0.14, 0.12, 0.12, 0.16, edge);
+      color = mix(color, pink,
+        clamp(pinkZones * (0.89 + 0.11 * broad), 0, 0.70)
+      );
+
+      // Vereinzelt hell ausgewaschene Pigmentkanten.
+      const washed =
+        0.32 * cloud(warpedU, warpedV, 0.05, 0.83, 0.18, 0.22, edge) +
+        0.27 * cloud(warpedU, warpedV, 0.73, 0.52, 0.16, 0.20, -edge);
+      color = mix(color, paper, washed);
+
+      // Leichtes Gekritzel und Papierpigment ohne digitale Regelmaessigkeit.
+      const scribble = Math.sin(10 * t + 23 * warpedV + medium * 1.9);
       const grain = (
-        Math.sin(x * 1.81 + y * 2.37) *
-        Math.cos(x * 2.09 - y * 1.67)
-      ) * 1.8;
+        Math.sin(x * 2.37 + y * 1.61) *
+        Math.cos(y * 2.71 - x * 1.34)
+      ) * 3.1 + 2.4 * flow + 1.1 * scribble;
 
       const i = (y * small.width + x) * 4;
       data[i] = Math.round(clamp(color[0] + grain, 0, 255));
@@ -923,7 +1126,6 @@ function drawBackground(ctx, width, height) {
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(small, 0, 0, width, height);
 }
-
 
 /* =========================================
    ECHOES / KOMPASS / SOCIAL LINKS
@@ -1350,9 +1552,9 @@ function drawCompass(ctx, cx, cy) {
     185
   );
 
-  gradient.addColorStop(0, "#A7D6D6");
-  gradient.addColorStop(0.7, "#78B8BD");
-  gradient.addColorStop(1, "#326E79");
+  gradient.addColorStop(0, "#E0EEEE");
+  gradient.addColorStop(0.7, "#A5D5D9");
+  gradient.addColorStop(1, "#70ACB7");
 
   ctx.fillStyle = gradient;
   ctx.beginPath();
@@ -1706,11 +1908,11 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     bodyY + bodyH
   );
 
-  bodyGradient.addColorStop(0, "#C0C47A");
-  bodyGradient.addColorStop(0.18, "#88C8C8");
-  bodyGradient.addColorStop(0.55, "#5799A3");
-  bodyGradient.addColorStop(0.82, "#79BAC0");
-  bodyGradient.addColorStop(1, "#2E6972");
+  bodyGradient.addColorStop(0, "#E2F1F1");
+  bodyGradient.addColorStop(0.18, "#B3DCDD");
+  bodyGradient.addColorStop(0.55, "#88C8C8");
+  bodyGradient.addColorStop(0.82, "#A6D4D9");
+  bodyGradient.addColorStop(1, "#6099A5");
 
   ctx.fillStyle = bodyGradient;
   ctx.beginPath();
@@ -1905,7 +2107,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   );
 
   railGradient.addColorStop(0, "#285C65");
-  railGradient.addColorStop(0.5, "#C0C47A");
+  railGradient.addColorStop(0.5, "#FCFCFC");
   railGradient.addColorStop(1, "#2C606B");
 
   ctx.fillStyle = railGradient;
@@ -1972,7 +2174,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.shadowColor = "rgba(192,196,122,.55)";
   ctx.shadowBlur = 16;
-  ctx.strokeStyle = "#C0C47A";
+  ctx.strokeStyle = "#DDEFF0";
   ctx.lineWidth = 2.5;
 
   ctx.beginPath();
@@ -2554,8 +2756,8 @@ function camouPrepareSection(index) {
 
   state.promise = (async () => {
 
-    if (index === 3) {
-      // ECHOES benoetigt nur den gezeichneten Kompass.
+    if (index === 3 || index === 4) {
+      // ECHOES und CONTACT benoetigen kein Bild.
       await camouWaitForPaintSlot(state);
 
       if (!CAMOU_V2_CANVASES[index]) {
@@ -2563,7 +2765,7 @@ function camouPrepareSection(index) {
       }
 
     } else {
-      // MUSIC, VISUALS und CONTACT.
+      // MUSIC und VISUALS: Bilder wie bisher laden.
       const image = await loadImage(
         sections[index].image
       );
@@ -2627,7 +2829,7 @@ function camouPrioritizeSection(index) {
     drawWrappedPanel(
       globeContext,
       index,
-      index === 2 || index === 3
+      index === 2 || index === 3 || index === 4
         ? null
         : camouPendingPhoto
     );
@@ -3189,6 +3391,13 @@ function isOnVisualLever(point) {
   );
 }
 
+function camouIsContactTitle(point) {
+  const q = islandPoint(point, 4);
+  return !!q &&
+    q.x >= -205 && q.x <= 210 &&
+    q.y >= -276 && q.y <= -172;
+}
+
 function handleGlobeClick(event) {
   const point = texturePoint(event);
 
@@ -3200,8 +3409,8 @@ function handleGlobeClick(event) {
     return;
   }
 
-  // Contact.
-  if (inImage(point, 4)) {
+  // Nur der unterstrichene Contact-Titel oeffnet das Formular.
+  if (camouIsContactTitle(point)) {
     openContactModal();
     return;
   }
@@ -4448,8 +4657,7 @@ paintPhoto = function(ctx, index, image) {
     cover(ctx, homeVideo, -photoW / 2, -photoH / 2, photoW, photoH);
     if (homeVideo.paused) playButton(ctx, 0, 0);
   } else if (isContact) {
-    // Kein cover(): Dadurch wird auf Desktop und Mobil nichts abgeschnitten.
-    camouDrawContained(ctx, image, -photoW / 2, -photoH / 2, photoW, photoH);
+    // CONTACT bekommt keinen Bildinhalt mehr.
   } else {
     cover(ctx, image, -photoW / 2, -photoH / 2, photoW, photoH);
     if (index === 0) playButton(ctx, 0, 0);
@@ -4646,12 +4854,33 @@ drawPanel = function(ctx, index, image) {
   ctx.font = "300 58px Manrope, Arial";
   ctx.fillStyle = "#FCFCFC";
 
-ctx.fillText(
-  section.title[0],
-  -12,
-  index === 3 ? -262 : -217,
-  820
-);
+if (index === 4) {
+  // Der Titel selbst dient als Link zum bestehenden Kontaktformular.
+  const title = "Contact";
+  const titleX = -12;
+  const titleY = -217;
+  ctx.fillText(title, titleX, titleY, 820);
+
+  const halfWidth = ctx.measureText(title).width / 2;
+  ctx.strokeStyle = "#FCFCFC";
+  ctx.lineWidth = 2.3;
+  ctx.beginPath();
+  ctx.moveTo(titleX - halfWidth, titleY + 12);
+  ctx.lineTo(titleX + halfWidth, titleY + 12);
+  ctx.stroke();
+
+  ctx.save();
+  ctx.font = "400 34px Manrope, Arial";
+  ctx.fillText("↗", titleX + halfWidth + 30, titleY - 5);
+  ctx.restore();
+} else {
+  ctx.fillText(
+    section.title[0],
+    -12,
+    index === 3 ? -262 : -217,
+    820
+  );
+}
 
   /* Beschreibung */
 
@@ -4660,7 +4889,12 @@ ctx.fillText(
   ctx.fillStyle =
   "rgba(252,252,252,.97)";
 
-if (side) {
+if (index === 4) {
+  // Ohne Kontaktbild stehen die Texte zentriert unter dem Link.
+  section.body.forEach((line, i) => {
+    ctx.fillText(line, -12, -112 + i * 38, 720);
+  });
+} else if (side) {
 
   if (mobile) {
 
@@ -4767,9 +5001,8 @@ if (side) {
 
     ctx.restore();
 
-  } else {
-    /* Home, Music, Contact */
-
+  } else if (index !== 4) {
+    /* Home und Music: unveraenderte Bild-/Videofunktion. */
     paintPhoto(ctx, index, image);
   }
 
@@ -5226,7 +5459,7 @@ function camouCreateRockyWorldTexture() {
       const relief =
         (mineral - 0.5) * 75;
 
-      // Lavendelgraue, mineralische Oberflaeche.
+      // Dunkles, verwaschenes Altrosa mit mineralischer Tiefe.
       const light = Math.max(
         0,
         nx * -0.48 +
@@ -5234,31 +5467,21 @@ function camouCreateRockyWorldTexture() {
         nz * 0.66
       );
 
-      const shade = 0.40 + 0.60 * light;
+      const shade = 0.42 + 0.58 * light;
+      const blush = smooth((large - 0.23) / 0.64);
       const i = (y * width + x) * 4;
 
-      image.data[i] = Math.max(
-        0,
-        Math.min(
-          255,
-          (113 + relief) * shade
-        )
+      image.data[i] = clamp(
+        (155 + blush * 32 + relief * 0.86) * shade,
+        0, 255
       );
-
-      image.data[i + 1] = Math.max(
-        0,
-        Math.min(
-          255,
-          (111 + relief * 0.91) * shade
-        )
+      image.data[i + 1] = clamp(
+        (121 + blush * 25 + relief * 0.78) * shade,
+        0, 255
       );
-
-      image.data[i + 2] = Math.max(
-        0,
-        Math.min(
-          255,
-          (140 + relief * 1.10) * shade
-        )
+      image.data[i + 2] = clamp(
+        (137 + blush * 25 + relief * 0.92) * shade,
+        0, 255
       );
 
       image.data[i + 3] = 255;
@@ -5288,89 +5511,35 @@ function camouCreateRockyWorldTexture() {
    INHALT DES ZWEITEN PROJEKTS
 ========================================= */
 
-function camouDrawSecondProject(ctx, image) {
-  ctx.clearRect(
-    0, 0, CAMOU_V2_W, CAMOU_V2_H
-  );
-
+function camouDrawSecondProject(ctx) {
+  ctx.clearRect(0, 0, CAMOU_V2_W, CAMOU_V2_H);
   ctx.save();
-
-  ctx.translate(
-    CAMOU_V2_W / 2,
-    CAMOU_V2_H / 2
-  );
-
+  ctx.translate(CAMOU_V2_W / 2, CAMOU_V2_H / 2);
   ctx.textAlign = "center";
-  ctx.fillStyle = "#f3eee9";
+  ctx.fillStyle = "#FCFCFC";
 
   ctx.font = "500 16px 'DM Mono', monospace";
-  ctx.fillText(
-    "PROJEKT 02  /  IN ENTSTEHUNG",
-    0, -310
-  );
+  ctx.fillText("PROJEKT 02  /  IN ENTSTEHUNG", 0, -157);
 
   ctx.font = "300 58px Manrope, Arial";
-  ctx.fillText(
-    "Eine neue Welt",
-    0, -233
-  );
+  ctx.fillText("Eine neue Welt", 0, -67, 820);
 
   ctx.font = "400 21px Manrope, Arial";
   ctx.fillText(
     "Ein neuer Ort für Musik, Bilder und Geschichten.",
-    0, -185
+    0, 2, 850
   );
-
-  const px = -230;
-  const py = -132;
-  const pw = 460;
-  const ph = 278;
-
-  ctx.fillStyle = "rgba(8,12,18,.75)";
-
-  ctx.fillRect(
-    px - 7,
-    py - 7,
-    pw + 14,
-    ph + 14
-  );
-
-  if (image) {
-    cover(ctx, image, px, py, pw, ph);
-  }
-
-  ctx.strokeStyle = "rgba(216,211,230,.75)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(px, py, pw, ph);
 
   ctx.font = "400 20px Manrope, Arial";
-  ctx.fillStyle = "#e1dce8";
-
-  ctx.fillText(
-    "Hier entsteht das nächste Projekt von b3nn3t.",
-    0, 206
-  );
+  ctx.fillText("Hier entsteht das nächste Projekt von b3nn3t.", 0, 119, 850);
 
   ctx.font = "400 15px 'DM Mono', monospace";
-  ctx.fillStyle = "rgba(220,216,236,.78)";
-
-  ctx.fillText(
-    "ZURÜCK: NAVIGATION ODER BUTTON",
-    0, 265
-  );
-
+  ctx.fillStyle = "rgba(252,252,252,.84)";
+  ctx.fillText("ZURÜCK: NAVIGATION ODER BUTTON", 0, 213);
   ctx.restore();
 }
 
-// Dieses Bild wird erst beim Besuch angefordert.
-function camouLoadSecondProjectImage() {
-  const url = new URL(
-    "./assets/planet-project.jpg",
-    import.meta.url
-  ).href;
 
-  return loadImage(url);
-}
 
 /* =========================================
    ZWEITEN PLANETEN BEI BEDARF ERSTELLEN
@@ -5442,10 +5611,7 @@ panel.visible = false;
 
       group.add(panel);
 
-      camouDrawSecondProject(
-        canvas.getContext("2d"),
-        null
-      );
+      camouDrawSecondProject(canvas.getContext("2d"));
 
       texture.needsUpdate = true;
 
@@ -5456,19 +5622,10 @@ panel.visible = false;
       camouSecondPlanetPanel = panel;
       camouSecondPlanetPanelTexture = texture;
 
-      // Auch beim ersten Besuch das Bild
-      // vor dem Start des Hinflugs vorbereiten.
-      return camouLoadSecondProjectImage().then(image => {
-        camouDrawSecondProject(
-          canvas.getContext("2d"),
-          image
-        );
-
-        texture.needsUpdate = true;
-        sceneNeedsRender = true;
-
-        return group;
-      });
+      // Kein Bilddownload: Der zweite Planet enthaelt nur Text.
+      texture.needsUpdate = true;
+      sceneNeedsRender = true;
+      return group;
     });
 
   return camouSecondPlanetReady;
@@ -6336,6 +6493,14 @@ handleGlobeClick = function(event) {
   camouOriginalGlobeClick(event);
 };
 
+// Sichtbarer Link-Cursor auf dem Contact-Schriftzug.
+renderer.domElement.addEventListener("pointermove", event => {
+  if (event.pointerType !== "mouse" || isDragging || camouWorldFlight) return;
+  renderer.domElement.style.cursor = camouIsContactTitle(texturePoint(event))
+    ? "pointer"
+    : "";
+});
+
 // Portal auf der Hauptkugel erzeugen.
 camouCreatePortal();
 
@@ -6451,9 +6616,9 @@ function camouDrawTracklist() {
     { n: "3", title: "verstand gg. Leib", x: -205, y: -175, r: -0.10, size: 29 },
     { n: "2", title: "mfg", x: 70, y: -255, r: 0.13, size: 35 },
     { n: "7", title: "SCHOTTER", x: 250, y: -145, r: -0.16, size: 31 },
-    { n: "5", title: "06:00, 06:05, 06:10, 06:15…", x: 245, y: 55, r: 0.08, size: 18 },
+    { n: "4", title: "06:00, 06:05, 06:10, 06:15…", x: 245, y: 55, r: 0.08, size: 18 },
     { n: "8", title: "suchtbedingt (outro)", x: 105, y: 235, r: -0.11, size: 24 },
-    { n: "", title: "wie die jungs", x: -145, y: 235, r: 0.12, size: 27 },
+    { n: "5", title: "wie die jungs", x: -145, y: 235, r: 0.12, size: 27 },
     { n: "1", title: "sanktgallen (intro)", x: -280, y: 35, r: -0.17, size: 23 },
     { n: "6", title: "moerder", x: -20, y: 80, r: 0.06, size: 33 }
   ];
@@ -6465,7 +6630,7 @@ function camouDrawTracklist() {
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(38,86,93,.78)";
     ctx.font = "500 15px 'DM Mono', monospace";
-    if (track.n) ctx.fillText(track.n.padStart(2, "0"), -8, -21);
+    if (track.n) ctx.fillText(track.n, -8, -21);
 
     ctx.fillStyle = "#FCFCFC";
     ctx.font = `500 ${track.size}px Manrope, Arial, sans-serif`;
@@ -6577,3 +6742,5 @@ const camouCountdownTimer = window.setInterval(
 );
 
 /* ENDE CAMOU – TRACKLIST + COUNTDOWN */
+
+
