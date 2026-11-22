@@ -30,6 +30,7 @@ const CAMOU_THEME = Object.freeze({
 const ASSETS = {
   home: new URL("./assets/hero.jpg", import.meta.url).href,
   homeVideo: new URL("./assets/test.mp4", import.meta.url).href,
+  ambientLoop: new URL("./assets/camouloop.mp3", import.meta.url).href,
   music: new URL("./assets/release.jpg", import.meta.url).href,
   visuals: new URL("./assets/visuals.jpg", import.meta.url).href,
   // Die Bildfolge im ??-Player entspricht genau den vier Assets.
@@ -587,14 +588,16 @@ function createCosmicTexture(colors) {
   return texture;
 }
 
-// Entfernte Sonne mit warmem Lichtschein
+// Entfernte Sonne: nun auch ein warmgelber Kern anstelle der weissen Mitte.
+// Der matte Gelbton verlaeuft weich in einen transparenten Lichtschein.
 const camouSunTexture = createCosmicTexture([
-  [0.00, "rgba(252,252,252,.95)"],
-  [0.12, "rgba(252,252,252,.82)"],
-  [0.25, "rgba(192,196,122,.62)"],
-  [0.40, "rgba(192,196,122,.25)"],
-  [0.65, "rgba(136,200,200,.09)"],
-  [1.00, "rgba(136,200,200,0)"]
+  [0.00, "rgba(238,218,132,1)"],
+  [0.09, "rgba(245,231,170,.99)"],
+  [0.17, "rgba(232,219,138,.88)"],
+  [0.29, "rgba(192,196,122,.51)"],
+  [0.44, "rgba(192,196,122,.22)"],
+  [0.70, "rgba(192,196,122,.055)"],
+  [1.00, "rgba(192,196,122,0)"]
 ]);
 
 const camouSun = new THREE.Sprite(
@@ -1054,6 +1057,80 @@ let homeVideoPlaying = false;
 let homeVideoStarting = false;
 let homeVideoFrameRequest = null;
 let lastVideoFallbackPaint = 0;
+
+/* =========================================
+   DURCHGEHENDE HINTERGRUNDMUSIK
+   camouloop.mp3 laeuft in Schleife. Das Zuhause-Video hat Vorrang.
+========================================= */
+
+const camouAmbientAudio = new Audio(ASSETS.ambientLoop);
+camouAmbientAudio.loop = true;
+camouAmbientAudio.preload = "auto";
+camouAmbientAudio.volume = 0.48;
+
+let camouAmbientGestureSeen = false;
+
+function camouPauseAmbientLoop() {
+  // pause() behaelt currentTime; nach dem Video geht es exakt dort weiter.
+  if (!camouAmbientAudio.paused) camouAmbientAudio.pause();
+}
+
+function camouPlayAmbientIfPossible() {
+  // Keine sich ueberlagernden Tonspuren, auch nicht waehrend video.play() laedt.
+  if (homeVideoStarting || !homeVideo.paused || document.hidden) return;
+  if (!camouAmbientAudio.paused) return;
+
+  try {
+    const attempt = camouAmbientAudio.play();
+    if (attempt && typeof attempt.catch === "function") {
+      // Ohne Nutzerinteraktion sperren Browser meist die automatische Wiedergabe.
+      // Die naechste echte Interaktion versucht es erneut.
+      attempt.catch(error => {
+        if (error?.name !== "NotAllowedError" &&
+            error?.name !== "AbortError") {
+          console.warn("CAMOU Hintergrundmusik:", error);
+        }
+      });
+    }
+  } catch (error) {
+    console.warn("CAMOU Hintergrundmusik:", error);
+  }
+}
+
+function camouStartAmbientAfterInteraction() {
+  camouAmbientGestureSeen = true;
+  camouPlayAmbientIfPossible();
+}
+
+// Kein zusaetzlicher Button: Musik beginnt bei der ersten erlaubten Interaktion.
+// pointerup (statt pointerdown), damit der Video-Klick bereits erkannt ist.
+document.addEventListener("pointerup", camouStartAmbientAfterInteraction, {
+  passive: true
+});
+document.addEventListener("keydown", event => {
+  if (!event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    camouStartAmbientAfterInteraction();
+  }
+});
+
+// Der Videostatus ist zusaetzlich direkt an das Audio gekoppelt.
+homeVideo.addEventListener("play", camouPauseAmbientLoop);
+homeVideo.addEventListener("playing", camouPauseAmbientLoop);
+homeVideo.addEventListener("pause", () => {
+  if (camouAmbientGestureSeen) camouPlayAmbientIfPossible();
+});
+homeVideo.addEventListener("ended", () => {
+  if (camouAmbientGestureSeen) camouPlayAmbientIfPossible();
+});
+
+// In Hintergrund-Tabs keinen Sound abspielen. Bei Rueckkehr fortsetzen.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) camouPauseAmbientLoop();
+  else if (camouAmbientGestureSeen) camouPlayAmbientIfPossible();
+});
+
+// Browser mit freigegebenem Autoplay starten sofort; alle anderen per Geste.
+camouPlayAmbientIfPossible();
 
 function startHomeVideoFrameUpdates() {
   if (
@@ -3642,6 +3719,7 @@ function handleGlobeClick(event) {
     ) {
       homeVideo.pause();
       homeVideoPlaying = false;
+      camouPlayAmbientIfPossible();
 
       stopHomeVideoFrameUpdates();
       updateHomeVideoFrame();
@@ -3649,6 +3727,7 @@ function handleGlobeClick(event) {
     }
 
     homeVideoStarting = true;
+    camouPauseAmbientLoop();
 
     homeVideo.play()
       .then(() => {
@@ -3661,6 +3740,7 @@ function handleGlobeClick(event) {
       })
       .catch(error => {
         homeVideoStarting = false;
+        camouPlayAmbientIfPossible();
 
         console.error(
           "CAMOU Home-Video:",
@@ -5077,18 +5157,17 @@ if (index === 1 || index === 4) {
   ctx.fillStyle = "rgba(252,252,252,.97)";
 
   if (index === 1) {
-    // FRAGMENTE: Das Gedicht beginnt bewusst weit unter dem Linktitel.
-    // Der Abstand entspricht ungefaehr 25 kleinen Textzeilen. Die Schrift
-    // liegt auf allen Geraeten um 90 Grad nach links gedreht und wird
-    // weiterhin sauber umbrochen, ohne die Flaeche zu verlassen.
+    // FRAGMENTE: Gedicht nochmals weiter unten als in v5; groessere Schrift.
+    // Die schmalere, um 90 Grad gedrehte Spalte behaelt Sicherheitsabstand
+    // zum unteren Rand der gekruemmten Inhaltsflaeche (auch mobil).
     ctx.save();
-    ctx.translate(mobile ? 72 : 85, mobile ? 270 : 272);
+    ctx.translate(mobile ? 88 : 85, mobile ? 301 : 302);
     ctx.rotate(-Math.PI / 2);
     camouDrawParagraphBlock(ctx, section.body, {
-      maxWidth: mobile ? 180 : 190,
-      maxHeight: mobile ? 415 : 440,
-      fontSize: mobile ? 17.5 : 19,
-      minFontSize: mobile ? 14.5 : 15.5,
+      maxWidth: mobile ? 135 : 135,
+      maxHeight: mobile ? 710 : 710,
+      fontSize: mobile ? 21.5 : 22,
+      minFontSize: mobile ? 20 : 20,
       leading: 1.17,
       paragraphGap: 6
     });
@@ -5538,7 +5617,8 @@ function camouCreatePortal() {
 
 
 function camouCreateRockyWorldTexture() {
-  const width = mobile ? 512 : 768;
+  // Hoehere Texturaufloesung fuer die deutlich kleineren Schriftfragmente.
+  const width = mobile ? 1024 : 1536;
   const height = width / 2;
 
   const canvas = document.createElement("canvas");
@@ -5716,11 +5796,13 @@ function camouDrawSecondPlanetScatteredText(ctx, width, height) {
   // Jede Schrift erscheint genau einmal, aber an einer eigenen Position.
   // Die Ausgangspunkte sind gleichmaessig ueber 360 Grad verteilt; die
   // kleine, reproduzierbare Zufallsabweichung macht die Anordnung organisch.
+  // Relativ zum Planeten jetzt etwa halb so gross wie in v5.
+  // Die vier Orte und ihre leicht zufaelligen Neigungen bleiben erhalten.
   const fragments = [
-    { text: "mach kein auge", u: .24, v: .33, size: 28, width: 200, tilt: -.11 },
-    { text: "detaillreiche qualität braucht seine zeit ja", u: .49, v: .71, size: 22, width: 246, tilt: .10 },
-    { text: "der nächste planet wird angesteuert!", u: .73, v: .29, size: 23, width: 247, tilt: -.07 },
-    { text: "mal sehen wo der wind mich hinweht >.<", u: .94, v: .70, size: 22, width: 240, tilt: .13 }
+    { text: "mach kein auge", u: .24, v: .33, size: 13.5, width: 138, tilt: -.11 },
+    { text: "detaillreiche qualität braucht seine zeit ja", u: .49, v: .71, size: 11.5, width: 171, tilt: .10 },
+    { text: "der nächste planet wird angesteuert!", u: .73, v: .29, size: 12, width: 174, tilt: -.07 },
+    { text: "mal sehen wo der wind mich hinweht >.<", u: .94, v: .70, size: 11.5, width: 168, tilt: .13 }
   ];
 
   let randomSeed = 0xC42026;
@@ -5753,9 +5835,9 @@ function camouDrawSecondPlanetScatteredText(ctx, width, height) {
       ctx.rotate(angle);
       ctx.fillStyle = "rgba(252,252,252,.96)";
       ctx.strokeStyle = "rgba(65,39,53,.38)";
-      ctx.lineWidth = 1.1 * scale;
-      ctx.shadowColor = "rgba(53,34,45,.36)";
-      ctx.shadowBlur = 5 * scale;
+      ctx.lineWidth = 0.55 * scale;
+      ctx.shadowColor = "rgba(53,34,45,.27)";
+      ctx.shadowBlur = 2.4 * scale;
 
       lines.forEach((line, i) => {
         const baseline = (i - (lines.length - 1) / 2) * leading;
