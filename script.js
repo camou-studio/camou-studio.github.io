@@ -17,6 +17,16 @@ const CONFIG = {
   visualScale: 0.78
 };
 
+// Farbwelt des camOu-Covers (Hauptglobus und Weltraum).
+// Die dunkleren Türkisabstufungen dienen nur Tiefe und Lesbarkeit.
+const CAMOU_THEME = Object.freeze({
+  aqua: "#88C8C8",
+  yellow: "#C0C47A",
+  pink: "#E9C3CE",
+  paper: "#FCFCFC",
+  ink: "#26565D"
+});
+
 const ASSETS = {
   home: new URL("./assets/hero.jpg", import.meta.url).href,
   homeVideo: new URL("./assets/test.mp4", import.meta.url).href,
@@ -134,7 +144,10 @@ for (const id of [
 }
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#091722");
+scene.background = new THREE.Color(CAMOU_THEME.paper);
+// Dieselbe Papierfarbe auch vor dem ersten WebGL-Frame zeigen.
+stage.style.backgroundColor = CAMOU_THEME.paper;
+container.style.backgroundColor = CAMOU_THEME.paper;
 
 const camera = new THREE.PerspectiveCamera(
   38,
@@ -212,12 +225,12 @@ function createCosmicTexture(colors) {
 
 // Entfernte Sonne mit warmem Lichtschein
 const camouSunTexture = createCosmicTexture([
-  [0.00, "rgba(255,245,202,1)"],
-  [0.12, "rgba(255,218,145,1)"],
-  [0.25, "rgba(242,166,91,.95)"],
-  [0.40, "rgba(223,129,75,.45)"],
-  [0.65, "rgba(212,107,64,.12)"],
-  [1.00, "rgba(212,107,64,0)"]
+  [0.00, "rgba(252,252,252,.95)"],
+  [0.12, "rgba(252,252,252,.82)"],
+  [0.25, "rgba(192,196,122,.62)"],
+  [0.40, "rgba(192,196,122,.25)"],
+  [0.65, "rgba(136,200,200,.09)"],
+  [1.00, "rgba(136,200,200,0)"]
 ]);
 
 const camouSun = new THREE.Sprite(
@@ -452,18 +465,18 @@ camouPlanet.scale.set(
 }
 /* ENDE CAMOU COSMOS */
 scene.add(
-  new THREE.AmbientLight(0xb8d8e1, 1.15)
+  new THREE.AmbientLight(0xe2f4f2, 1.15)
 );
 
 const light = new THREE.DirectionalLight(
-  0xffe2b5, 2.1
+  0xfcfcfc, 2.1
 );
 
 light.position.set(-3, 4, 5);
 scene.add(light);
 
 const rim = new THREE.PointLight(
-  0x63c9cf, 24, 15
+  0x88c8c8, 24, 15
 );
 
 rim.position.set(4, -1, -3);
@@ -492,7 +505,7 @@ const atmosphere = new THREE.Mesh(
     CONFIG.radius * 1.012, 96, 64
   ),
   new THREE.MeshBasicMaterial({
-    color: 0xa9bd9f,
+    color: 0x88c8c8,
     transparent: true,
     opacity: 0.055,
     side: THREE.BackSide
@@ -732,8 +745,8 @@ function loadImage(src) {
         0, 0, 1024, 1024
       );
 
-      gradient.addColorStop(0, "#354a39");
-      gradient.addColorStop(1, "#0a1510");
+      gradient.addColorStop(0, "#88C8C8");
+      gradient.addColorStop(1, "#4C919B");
 
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, 1024, 1024);
@@ -781,10 +794,10 @@ function playButton(ctx, x, y) {
   ctx.beginPath();
   ctx.arc(x, y, 24, 0, Math.PI * 2);
 
-  ctx.fillStyle = "rgba(8,13,10,.72)";
+  ctx.fillStyle = "rgba(38,86,93,.75)";
   ctx.fill();
 
-  ctx.strokeStyle = "#f0f2eb";
+  ctx.strokeStyle = "#FCFCFC";
   ctx.lineWidth = 2;
   ctx.stroke();
 
@@ -794,7 +807,7 @@ function playButton(ctx, x, y) {
   ctx.lineTo(x - 6, y + 10);
   ctx.closePath();
 
-  ctx.fillStyle = "#f0f2eb";
+  ctx.fillStyle = "#FCFCFC";
   ctx.fill();
   ctx.restore();
 }
@@ -810,143 +823,107 @@ function drawBackground(ctx, width, height) {
   small.height = 256;
 
   const g = small.getContext("2d");
-  const image = g.createImageData(512, 256);
+  const image = g.createImageData(small.width, small.height);
   const data = image.data;
 
-  // Die Positionen stammen unveraendert aus VISUALS und ECHOES.
-  const centers = [PLACES[2], PLACES[3]].map(p => {
-    const lat = p.lat * RAD;
-    return {
-      sinLat: Math.sin(lat),
-      cosLat: Math.cos(lat),
-      lon: p.lon * RAD
-    };
-  });
+  // Helle Aqua-Grundierung mit mehrfach ineinanderlaufenden,
+  // unregelmaessigen Farbwolken wie auf dem camOu-Cover.
+  // Der Verlauf bleibt an der horizontalen Kante anschlussfaehig.
+  const aqua = [136, 200, 200]; // #88C8C8
+  const deepAqua = [89, 157, 171];
+  const blueAqua = [111, 179, 192];
+  const yellow = [192, 196, 122]; // #C0C47A
+  const pink = [233, 195, 206];   // #E9C3CE
+  const paper = [252, 252, 252];  // #FCFCFC
 
-  // Ausschliesslich von x abhaengige Werte einmal berechnen.
-  const columns = Array.from({ length: 512 }, (_, x) => {
-    const u = x / 512;
-    const lon = (u - 0.25) * Math.PI * 2;
+  const blend = (c1, c2, amount) => {
+    const t = clamp(amount, 0, 1);
+    return [
+      lerp(c1[0], c2[0], t),
+      lerp(c1[1], c2[1], t),
+      lerp(c1[2], c2[2], t)
+    ];
+  };
 
-    return {
-      waveX: u * Math.PI * 2,
-      glowX: u * Math.PI * 4,
-      flow1X: u * Math.PI * 6,
-      flow2X: u * Math.PI * 4,
-      flow3X: u * Math.PI * 8,
-      marbling2X: u * Math.PI * 12,
-      cosMarbling3X: Math.cos(u * Math.PI * 6),
-      lightingX: Math.cos(2 * Math.PI * (u - 0.25)),
-      greenCos0: Math.cos(lon - centers[0].lon),
-      greenCos1: Math.cos(lon - centers[1].lon)
-    };
-  });
+  const cloud = (u, v, cx, cy, rx, ry) => {
+    const dx = Math.abs(u - cx);
+    const wrappedX = Math.min(dx, 1 - dx) / rx;
+    const dy = (v - cy) / ry;
+    return 1 - smooth(Math.hypot(wrappedX, dy));
+  };
 
-  for (let y = 0; y < 256; y++) {
-    const v = y / 255;
-    const lat = (0.5 - v) * Math.PI;
-    const sinLat = Math.sin(lat);
-    const cosLat = Math.cos(lat);
+  for (let y = 0; y < small.height; y++) {
+    const v = (y + 0.5) / small.height;
 
-    // Ausschliesslich von y abhaengige Werte einmal pro Zeile.
-    const pole = smooth(
-      Math.min(1, Math.min(v, 1 - v) / 0.24)
-    );
-    const flow1Y = Math.sin(v * Math.PI * 4) * 1.8;
-    const flow2Y = Math.sin(v * Math.PI * 6) * 1.5;
-    const flow3Y = Math.cos(v * Math.PI * 5);
-    const waveY = v * 2.2;
-    const glowY = v * 3.1;
-    const marbling1Y = Math.sin(v * Math.PI * 4) * 1.4;
-    const marbling2Y = v * Math.PI * 5;
-    const marbling3Y = v * Math.PI * 7;
-    const lightingY = Math.sin(Math.PI * v);
-    const vignetteY =
-      1 - 0.07 * Math.pow(Math.abs(v - 0.5) * 2, 2);
+    for (let x = 0; x < small.width; x++) {
+      const u = (x + 0.5) / small.width;
+      const phase = 2 * Math.PI * u;
 
-    const greenLat0 = sinLat * centers[0].sinLat;
-    const greenLon0 = cosLat * centers[0].cosLat;
-    const greenLat1 = sinLat * centers[1].sinLat;
-    const greenLon1 = cosLat * centers[1].cosLat;
-
-    for (let x = 0; x < 512; x++) {
-      const col = columns[x];
-
-      const wave = Math.sin(col.waveX + waveY);
-      const glow = Math.cos(col.glowX - glowY);
-
-      const flow1 = Math.sin(col.flow1X + flow1Y);
-      const flow2 = Math.cos(col.flow2X + flow2Y);
-      const flow3 = Math.sin(col.flow3X + flow3Y);
-
-      const organic =
-        flow1 * 0.45 + flow2 * 0.35 + flow3 * 0.20;
-
-      const color0 = lerp(
-        17, 32 + wave * 18 + organic * 24, pole
+      // Drei Frequenzen ergeben organische, leicht gekritzelte
+      // Farbverlaeufe statt geometrischer Kreisflecken.
+      const broad = Math.sin(
+        phase * 2 + Math.sin(v * 7.8) * 1.2 + v * 5.2
       );
-      const color1 = lerp(
-        67, 131 + glow * 22 + organic * 31, pole
+      const middle = Math.cos(
+        phase * 4 - Math.sin(v * 11.3) * 1.0 - v * 8.1
       );
-      const color2 = lerp(
-        89, 145 + wave * 20 + organic * 38, pole
+      const fine = Math.sin(
+        phase * 10 + v * 32 + Math.cos(phase * 3) * 1.2
+      );
+      const flow = broad * 0.51 + middle * 0.33 + fine * 0.16;
+      const warpU = u + 0.031 * Math.sin(v * 16 + broad * 1.2);
+      const warpV = v + 0.038 * Math.cos(phase * 3 + middle);
+
+      // Sanft wechselnde Blau-/Tuerkisabstufungen.
+      let color = blend(aqua, deepAqua,
+        0.10 + 0.25 * (0.5 + 0.5 * broad) + 0.12 * Math.abs(flow)
+      );
+      color = blend(color, blueAqua,
+        0.11 + 0.24 * (0.5 + 0.5 * middle)
       );
 
-      const lighting =
-        (1 + 0.035 * col.lightingX * lightingY) * vignetteY;
+      // Gelb als kleine, weich verlaufende Akzentzonen.
+      const yellowInfluence = (
+        cloud(warpU, warpV, 0.84, 0.72, 0.24, 0.36) * 0.48 +
+        cloud(warpU, warpV, 0.25, 0.35, 0.19, 0.25) * 0.30
+      ) * (0.84 + 0.16 * flow);
+      color = blend(color, yellow, yellowInfluence);
 
-      const marbling =
-        Math.sin(col.flow3X + marbling1Y) * 0.47 +
-        Math.cos(col.marbling2X - marbling2Y) * 0.30 +
-        Math.sin(marbling3Y + col.cosMarbling3X) * 0.23;
+      // Ein deutlich kleinerer, unregelmaessiger Rosa-Anteil.
+      const pinkInfluence = (
+        cloud(warpU, warpV, 0.62, 0.57, 0.15, 0.24) * 0.30 +
+        cloud(warpU, warpV, 0.08, 0.18, 0.11, 0.15) * 0.13
+      ) * (0.83 + 0.17 * middle);
+      color = blend(color, pink, pinkInfluence);
 
-      const reach = 0.34 + 0.10 * marbling;
-      let greenInfluence = 0;
+      // Vereinzelte helle Papier-Aufhellungen, nie eine
+      // deckende weisse Kugeloberflaeche.
+      const paperInfluence = (
+        cloud(warpU, warpV, 0.43, 0.15, 0.27, 0.25) * 0.22 +
+        cloud(warpU, warpV, 0.03, 0.82, 0.20, 0.30) * 0.16
+      );
+      color = blend(color, paper, paperInfluence);
 
-      // Beide Farbzentren mit denselben Formeln wie bisher.
-      const dot0 = clamp(
-        greenLat0 + greenLon0 * col.greenCos0, -1, 1
-      );
-      const influence0 =
-        1 - smooth((Math.acos(dot0) - reach) / 1.05);
-      greenInfluence =
-        1 - (1 - greenInfluence) * (1 - influence0);
+      // Dezente Pigmentkoernung; die Grundform bleibt weich.
+      const grain = (
+        Math.sin(x * 1.81 + y * 2.37) *
+        Math.cos(x * 2.09 - y * 1.67)
+      ) * 1.8;
 
-      const dot1 = clamp(
-        greenLat1 + greenLon1 * col.greenCos1, -1, 1
-      );
-      const influence1 =
-        1 - smooth((Math.acos(dot1) - reach) / 1.05);
-      greenInfluence =
-        1 - (1 - greenInfluence) * (1 - influence1);
-
-      const mix = clamp(
-        greenInfluence * (0.66 + 0.09 * organic), 0, 0.78
-      );
-
-      const j = (y * 512 + x) * 4;
-      data[j] = clamp(
-        lerp(color0, 12 + marbling * 4, mix) * lighting,
-        0, 255
-      );
-      data[j + 1] = clamp(
-        lerp(color1, 48 + marbling * 10, mix) * lighting,
-        0, 255
-      );
-      data[j + 2] = clamp(
-        lerp(color2, 34 + marbling * 6, mix) * lighting,
-        0, 255
-      );
-      data[j + 3] = 255;
+      const i = (y * small.width + x) * 4;
+      data[i] = Math.round(clamp(color[0] + grain, 0, 255));
+      data[i + 1] = Math.round(clamp(color[1] + grain, 0, 255));
+      data[i + 2] = Math.round(clamp(color[2] + grain, 0, 255));
+      data[i + 3] = 255;
     }
   }
 
   g.putImageData(image, 0, 0);
-
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(small, 0, 0, width, height);
 }
+
 
 /* =========================================
    ECHOES / KOMPASS / SOCIAL LINKS
@@ -1170,7 +1147,7 @@ function drawSensorControl(ctx, cx) {
   ctx.textAlign = "left";
 
   ctx.lineWidth = 1.5;
-  ctx.strokeStyle = "rgba(225,238,220,.7)";
+  ctx.strokeStyle = "rgba(252,252,252,.85)";
 
   ctx.strokeRect(
     cx + SENSOR_CONTROL.checkboxX,
@@ -1180,7 +1157,7 @@ function drawSensorControl(ctx, cx) {
   );
 
   if (sensorOptIn) {
-    ctx.strokeStyle = "#d9e8d2";
+    ctx.strokeStyle = "#C0C47A";
     ctx.lineWidth = 2.5;
     ctx.beginPath();
 
@@ -1203,7 +1180,7 @@ function drawSensorControl(ctx, cx) {
   }
 
   ctx.font = "500 11px 'DM Mono', monospace";
-  ctx.fillStyle = "#e5eee0";
+  ctx.fillStyle = "#FCFCFC";
 
   ctx.fillText(
     "SENSOR AKTIVIEREN",
@@ -1213,7 +1190,7 @@ function drawSensorControl(ctx, cx) {
 
   ctx.font = "9px 'DM Mono', monospace";
   ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(193,211,188,.82)";
+  ctx.fillStyle = "rgba(252,252,252,.85)";
 
   ctx.fillText(
     sensorStatusText,
@@ -1308,8 +1285,8 @@ function socialIcon(ctx, name, x, y) {
   ctx.save();
   ctx.translate(x, y);
 
-  ctx.strokeStyle = "#eef5eb";
-  ctx.fillStyle = "#eef5eb";
+  ctx.strokeStyle = "#FCFCFC";
+  ctx.fillStyle = "#FCFCFC";
   ctx.lineWidth = 2.7;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -1373,9 +1350,9 @@ function drawCompass(ctx, cx, cy) {
     185
   );
 
-  gradient.addColorStop(0, "#24372b");
-  gradient.addColorStop(0.7, "#0e1912");
-  gradient.addColorStop(1, "#050b07");
+  gradient.addColorStop(0, "#A7D6D6");
+  gradient.addColorStop(0.7, "#78B8BD");
+  gradient.addColorStop(1, "#326E79");
 
   ctx.fillStyle = gradient;
   ctx.beginPath();
@@ -1390,19 +1367,19 @@ function drawCompass(ctx, cx, cy) {
   );
 
   rimMetal.addColorStop(
-    0, "rgba(142,177,151,.40)"
+    0, "rgba(252,252,252,.60)"
   );
 
   rimMetal.addColorStop(
-    0.32, "rgba(207,225,206,.72)"
+    0.32, "rgba(192,196,122,.85)"
   );
 
   rimMetal.addColorStop(
-    0.68, "rgba(101,143,117,.38)"
+    0.68, "rgba(81,153,167,.48)"
   );
 
   rimMetal.addColorStop(
-    1, "rgba(171,198,175,.58)"
+    1, "rgba(252,252,252,.64)"
   );
 
   ctx.strokeStyle = rimMetal;
@@ -1410,7 +1387,7 @@ function drawCompass(ctx, cx, cy) {
   ctx.stroke();
 
   // Schmale dunkle Fuge zwischen Gehaeuse und Glas.
-  ctx.strokeStyle = "rgba(7,19,14,.72)";
+  ctx.strokeStyle = "rgba(38,86,93,.70)";
   ctx.lineWidth = 2;
 
   ctx.beginPath();
@@ -1418,7 +1395,7 @@ function drawCompass(ctx, cx, cy) {
   ctx.stroke();
 
   // Zurueckhaltender innerer Rand.
-  ctx.strokeStyle = "rgba(160,192,166,.19)";
+  ctx.strokeStyle = "rgba(252,252,252,.31)";
   ctx.lineWidth = 0.8;
 
   ctx.beginPath();
@@ -1451,14 +1428,14 @@ function drawCompass(ctx, cx, cy) {
     );
 
     ctx.strokeStyle = major
-      ? "rgba(240,248,237,.9)"
-      : "rgba(240,248,237,.5)";
+      ? "rgba(252,252,252,.96)"
+      : "rgba(252,252,252,.62)";
 
     ctx.lineWidth = major ? 1.8 : 0.8;
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "rgba(220,237,216,.18)";
+  ctx.strokeStyle = "rgba(38,86,93,.23)";
   ctx.lineWidth = 1;
 
   for (let i = 0; i < 8; i++) {
@@ -1490,14 +1467,14 @@ function drawCompass(ctx, cx, cy) {
   ctx.shadowOffsetX = 2;
   ctx.shadowOffsetY = 2;
 
-  // Rote Spitze mit dezenter seitlicher Schattierung.
+  // Rosafarbene Spitze mit dezenter seitlicher Schattierung.
   const redMetal = ctx.createLinearGradient(
     -12, 0, 12, 0
   );
 
-  redMetal.addColorStop(0, "#a52b25");
-  redMetal.addColorStop(0.42, "#ed4438");
-  redMetal.addColorStop(1, "#ff6656");
+  redMetal.addColorStop(0, "#BD889B");
+  redMetal.addColorStop(0.42, "#E9C3CE");
+  redMetal.addColorStop(1, "#F4DDE4");
 
   ctx.fillStyle = redMetal;
 
@@ -1514,9 +1491,9 @@ function drawCompass(ctx, cx, cy) {
     -12, 0, 12, 0
   );
 
-  paleMetal.addColorStop(0, "#a6b7aa");
-  paleMetal.addColorStop(0.45, "#e9eee5");
-  paleMetal.addColorStop(1, "#fffdf0");
+  paleMetal.addColorStop(0, "#7DB4B5");
+  paleMetal.addColorStop(0.45, "#C0C47A");
+  paleMetal.addColorStop(1, "#FCFCFC");
 
   ctx.fillStyle = paleMetal;
 
@@ -1552,12 +1529,12 @@ function drawCompass(ctx, cx, cy) {
 
   glass.addColorStop(
     0,
-    "rgba(235,251,234,.17)"
+    "rgba(252,252,252,.23)"
   );
 
   glass.addColorStop(
     0.28,
-    "rgba(198,235,213,.045)"
+    "rgba(233,195,206,.065)"
   );
 
   glass.addColorStop(
@@ -1567,7 +1544,7 @@ function drawCompass(ctx, cx, cy) {
 
   glass.addColorStop(
     1,
-    "rgba(0,15,11,.23)"
+    "rgba(38,86,93,.19)"
   );
 
   ctx.fillStyle = glass;
@@ -1598,7 +1575,7 @@ function drawCompass(ctx, cx, cy) {
     ctx.shadowBlur = 13;
     ctx.shadowOffsetY = 4;
 
-    // Gewoelbtes, gruenliches Glas
+    // Gewoelbtes, tuerkisfarbenes Glas
     const buttonGlass = ctx.createRadialGradient(
       x - 10,
       y - 12,
@@ -1610,22 +1587,22 @@ function drawCompass(ctx, cx, cy) {
 
     buttonGlass.addColorStop(
       0,
-      "#789686"
+      "#ABD7D6"
     );
 
     buttonGlass.addColorStop(
       0.22,
-      "#3c6250"
+      "#88C8C8"
     );
 
     buttonGlass.addColorStop(
       0.58,
-      "#142c23"
+      "#4D949E"
     );
 
     buttonGlass.addColorStop(
       1,
-      "#07140f"
+      "#285D67"
     );
 
     ctx.fillStyle = buttonGlass;
@@ -1647,7 +1624,7 @@ function drawCompass(ctx, cx, cy) {
     // Praegnanter heller Metall-/Glasring
 
 ctx.strokeStyle =
-  "rgba(166,204,178,.58)";
+  "rgba(252,252,252,.82)";
 
 ctx.lineWidth = 1.2;
 ctx.stroke();
@@ -1664,7 +1641,7 @@ ctx.stroke();
     );
 
 ctx.strokeStyle =
-  "rgba(205,233,207,.22)";
+  "rgba(252,252,252,.43)";
 
 ctx.lineWidth = 1.1;
 ctx.stroke();
@@ -1681,8 +1658,8 @@ ctx.stroke();
     ctx.restore();
   }
 
-  ctx.fillStyle = "#15231a";
-  ctx.strokeStyle = "#e1ebe0";
+  ctx.fillStyle = "#326E79";
+  ctx.strokeStyle = "#FCFCFC";
   ctx.lineWidth = 2;
 
   ctx.beginPath();
@@ -1690,7 +1667,7 @@ ctx.stroke();
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = "#dbe7d6";
+  ctx.fillStyle = "#C0C47A";
   ctx.beginPath();
   ctx.arc(cx, cy, 3, 0, Math.PI * 2);
   ctx.fill();
@@ -1729,11 +1706,11 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     bodyY + bodyH
   );
 
-  bodyGradient.addColorStop(0, "#75816e");
-  bodyGradient.addColorStop(0.18, "#3b493b");
-  bodyGradient.addColorStop(0.55, "#1b281f");
-  bodyGradient.addColorStop(0.82, "#354334");
-  bodyGradient.addColorStop(1, "#101811");
+  bodyGradient.addColorStop(0, "#C0C47A");
+  bodyGradient.addColorStop(0.18, "#88C8C8");
+  bodyGradient.addColorStop(0.55, "#5799A3");
+  bodyGradient.addColorStop(0.82, "#79BAC0");
+  bodyGradient.addColorStop(1, "#2E6972");
 
   ctx.fillStyle = bodyGradient;
   ctx.beginPath();
@@ -1747,7 +1724,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.save();
 
-  ctx.strokeStyle = "rgba(218,231,207,.65)";
+  ctx.strokeStyle = "rgba(252,252,252,.83)";
   ctx.lineWidth = 3;
 
   ctx.beginPath();
@@ -1797,12 +1774,12 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ];
 
   for (const [sx, sy] of screws) {
-    ctx.fillStyle = "#101711";
+    ctx.fillStyle = "#2C606B";
     ctx.beginPath();
     ctx.arc(sx, sy, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(221,232,213,.55)";
+    ctx.strokeStyle = "rgba(252,252,252,.74)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
@@ -1820,9 +1797,9 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     windowY + windowH
   );
 
-  frameGradient.addColorStop(0, "#050906");
-  frameGradient.addColorStop(0.5, "#18231b");
-  frameGradient.addColorStop(1, "#050906");
+  frameGradient.addColorStop(0, "#26565D");
+  frameGradient.addColorStop(0.5, "#4D929D");
+  frameGradient.addColorStop(1, "#26565D");
 
   ctx.fillStyle = frameGradient;
 
@@ -1837,7 +1814,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(210,225,200,.65)";
+  ctx.strokeStyle = "rgba(252,252,252,.78)";
   ctx.lineWidth = 3;
   ctx.stroke();
 
@@ -1864,7 +1841,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
       windowH
     );
   } else {
-    ctx.fillStyle = "#101811";
+    ctx.fillStyle = "#2E6972";
     ctx.fillRect(
       windowX,
       windowY,
@@ -1901,7 +1878,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.restore();
 
-  ctx.fillStyle = "rgba(224,235,216,.8)";
+  ctx.fillStyle = "rgba(252,252,252,.92)";
   ctx.font = "bold 15px 'DM Mono', monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -1927,9 +1904,9 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     0
   );
 
-  railGradient.addColorStop(0, "#090e0a");
-  railGradient.addColorStop(0.5, "#a7b39b");
-  railGradient.addColorStop(1, "#101711");
+  railGradient.addColorStop(0, "#285C65");
+  railGradient.addColorStop(0.5, "#C0C47A");
+  railGradient.addColorStop(1, "#2C606B");
 
   ctx.fillStyle = railGradient;
   ctx.beginPath();
@@ -1943,7 +1920,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   );
 
   ctx.fill();
-  ctx.strokeStyle = "rgba(220,232,212,.65)";
+  ctx.strokeStyle = "rgba(252,252,252,.83)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
@@ -1954,9 +1931,9 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     0
   );
 
-  rodGradient.addColorStop(0, "#151c16");
-  rodGradient.addColorStop(0.45, "#d1d9c9");
-  rodGradient.addColorStop(1, "#394638");
+  rodGradient.addColorStop(0, "#275C67");
+  rodGradient.addColorStop(0.45, "#FCFCFC");
+  rodGradient.addColorStop(1, "#5E9EAA");
 
   ctx.strokeStyle = rodGradient;
   ctx.lineWidth = 9;
@@ -1976,26 +1953,26 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     23
   );
 
-  knobGradient.addColorStop(0, "#dce5d3");
-  knobGradient.addColorStop(0.35, "#82917a");
-  knobGradient.addColorStop(0.75, "#354333");
-  knobGradient.addColorStop(1, "#111a12");
+  knobGradient.addColorStop(0, "#FCFCFC");
+  knobGradient.addColorStop(0.35, "#88C8C8");
+  knobGradient.addColorStop(0.75, "#619CA7");
+  knobGradient.addColorStop(1, "#2E6873");
 
   ctx.fillStyle = knobGradient;
   ctx.beginPath();
   ctx.arc(leverX, knobY, 22, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(225,237,215,.85)";
+  ctx.strokeStyle = "rgba(252,252,252,.90)";
   ctx.lineWidth = 2;
   ctx.stroke();
 
   // Dezente PRESS-Markierung.
   ctx.save();
 
-  ctx.shadowColor = "rgba(190,235,165,.65)";
+  ctx.shadowColor = "rgba(192,196,122,.55)";
   ctx.shadowBlur = 16;
-  ctx.strokeStyle = "#c5e8b6";
+  ctx.strokeStyle = "#C0C47A";
   ctx.lineWidth = 2.5;
 
   ctx.beginPath();
@@ -2008,7 +1985,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ctx.font = "700 15px 'DM Mono', monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#101b12";
+  ctx.fillStyle = "#26565D";
 
   ctx.fillText(
     "PRESS",
@@ -2019,7 +1996,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.restore();
 
-  ctx.fillStyle = "rgba(226,237,218,.85)";
+  ctx.fillStyle = "rgba(252,252,252,.88)";
   ctx.font = "bold 22px Arial";
   ctx.textAlign = "center";
 
@@ -2029,7 +2006,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     leverBottom + 25
   );
 
-  ctx.fillStyle = "#dce7d5";
+  ctx.fillStyle = "#FCFCFC";
   ctx.font = "bold 15px 'DM Mono', monospace";
   ctx.textAlign = "right";
 
@@ -2107,11 +2084,11 @@ function drawOpenLabel(ctx, cx, ix, iy, iw, ih) {
   );
 
   shade.addColorStop(
-    0, "rgba(5,12,8,0)"
+    0, "rgba(38,86,93,0)"
   );
 
   shade.addColorStop(
-    1, "rgba(5,12,8,.85)"
+    1, "rgba(38,86,93,.88)"
   );
 
   ctx.fillStyle = shade;
@@ -2125,7 +2102,7 @@ function drawOpenLabel(ctx, cx, ix, iy, iw, ih) {
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#edf4e9";
+  ctx.fillStyle = "#FCFCFC";
   ctx.font = "500 21px 'DM Mono', monospace";
 
   ctx.fillText(
@@ -2178,7 +2155,7 @@ function paintPhoto(
   ctx.rotate(p.photoR);
 
   if (!onlyVideo) {
-    ctx.fillStyle = "rgba(7,12,9,.92)";
+    ctx.fillStyle = "rgba(38,86,93,.92)";
 
     ctx.fillRect(
       -PHOTO_W / 2 - 8,
@@ -2245,7 +2222,7 @@ function paintPhoto(
       );
     }
 
-    ctx.strokeStyle = "rgba(225,237,220,.52)";
+    ctx.strokeStyle = "rgba(252,252,252,.71)";
     ctx.lineWidth = 2;
 
     ctx.strokeRect(
@@ -2268,7 +2245,7 @@ function drawPanel(ctx, index, image) {
   ctx.textAlign = "center";
 
   // Dezente Linie statt rechteckiger Bereichsgrenze.
-  ctx.strokeStyle = "rgba(207,226,200,.27)";
+  ctx.strokeStyle = "rgba(192,196,122,.45)";
   ctx.lineWidth = 1.5;
 
   ctx.beginPath();
@@ -2277,7 +2254,7 @@ function drawPanel(ctx, index, image) {
   ctx.stroke();
 
   // Kategorie.
-  ctx.fillStyle = "rgba(231,242,225,.65)";
+  ctx.fillStyle = "rgba(252,252,252,.83)";
   ctx.font = "500 19px 'DM Mono', monospace";
 
   ctx.fillText(
@@ -2288,7 +2265,7 @@ function drawPanel(ctx, index, image) {
   );
 
   // Titel.
-  ctx.fillStyle = "#f0f2eb";
+  ctx.fillStyle = "#FCFCFC";
   ctx.font = "300 58px Manrope, Arial";
 
   section.title.forEach((line, i) => {
@@ -2301,7 +2278,7 @@ function drawPanel(ctx, index, image) {
   });
 
   // Beschreibung.
-  ctx.fillStyle = "rgba(236,242,232,.87)";
+  ctx.fillStyle = "rgba(252,252,252,.95)";
   ctx.font = "400 22px Manrope, Arial";
 
   section.body.forEach((line, i) => {
@@ -2351,7 +2328,7 @@ function drawPanel(ctx, index, image) {
   }
 
   // Kleine Sektionsnummer.
-  ctx.fillStyle = "rgba(225,235,219,.62)";
+  ctx.fillStyle = "rgba(252,252,252,.82)";
   ctx.font = "500 17px 'DM Mono', monospace";
 
   ctx.fillText(
@@ -4459,7 +4436,7 @@ paintPhoto = function(ctx, index, image) {
   }
   ctx.rotate(p.photoR);
 
-  ctx.fillStyle = "rgba(8,23,31,.94)";
+  ctx.fillStyle = "rgba(38,86,93,.92)";
   ctx.fillRect(-photoW / 2 - 7, -photoH / 2 - 7, photoW + 14, photoH + 14);
 
   ctx.save();
@@ -4484,7 +4461,7 @@ paintPhoto = function(ctx, index, image) {
     drawOpenLabel(ctx, 0, -photoW / 2, -photoH / 2, photoW, photoH);
   }
 
-  ctx.strokeStyle = "rgba(165,216,211,.65)";
+  ctx.strokeStyle = "rgba(252,252,252,.78)";
   ctx.lineWidth = 2;
   ctx.strokeRect(-photoW / 2, -photoH / 2, photoW, photoH);
   ctx.restore();
@@ -4582,7 +4559,7 @@ function camouDrawOrganicZone(ctx, index) {
           edge *
           (0.80 + 0.12 * drift);
 
-        // Moos- und Waldgruentoene
+        // Tuerkis-, Gelb- und Rosa-Pigmente
         const moss = fade(
           (drift + 0.50) / 1.1
         );
@@ -4591,15 +4568,15 @@ function camouDrawOrganicZone(ctx, index) {
           (y * canvas.width + x) * 4;
 
         data[i] = Math.round(
-          11 + 17 * moss
+          105 + 76 * moss
         );
 
         data[i + 1] = Math.round(
-          29 + 29 * moss
+          169 + 31 * moss
         );
 
         data[i + 2] = Math.round(
-          22 + 13 * moss
+          180 + 20 * moss
         );
 
         data[i + 3] = Math.round(
@@ -4640,7 +4617,7 @@ drawPanel = function(ctx, index, image) {
 
   if (CAMOU_V2_SHOW_LABELS) {
     ctx.fillStyle =
-  "rgba(224,237,232,.80)";
+  "rgba(252,252,252,.85)";
     ctx.lineWidth = 1.5;
 
     ctx.beginPath();
@@ -4654,7 +4631,7 @@ drawPanel = function(ctx, index, image) {
       "500 19px 'DM Mono', monospace";
 
     ctx.fillStyle =
-      "rgba(231,242,225,.70)";
+      "rgba(252,252,252,.85)";
 
     ctx.fillText(
       section.eyebrow,
@@ -4667,7 +4644,7 @@ drawPanel = function(ctx, index, image) {
   /* Haupttitel */
 
   ctx.font = "300 58px Manrope, Arial";
-  ctx.fillStyle = "#F4F1E8";
+  ctx.fillStyle = "#FCFCFC";
 
 ctx.fillText(
   section.title[0],
@@ -4681,7 +4658,7 @@ ctx.fillText(
   ctx.font = "400 22px Manrope, Arial";
 
   ctx.fillStyle =
-  "rgba(244,241,232,.94)";
+  "rgba(252,252,252,.97)";
 
 if (side) {
 
@@ -5099,13 +5076,13 @@ function camouCreatePortal() {
 
   c.shadowColor = "rgba(0,0,0,.7)";
   c.shadowBlur = 14;
-  c.fillStyle = "#e6ede5";
+  c.fillStyle = "#FCFCFC";
 
   c.fillText("BEAM ME UP  ↗", 0, 0);
 
   c.shadowBlur = 0;
 
-  c.strokeStyle = "rgba(213,238,216,.38)";
+  c.strokeStyle = "rgba(192,196,122,.70)";
   c.lineWidth = 1;
 
   c.beginPath();
@@ -6427,14 +6404,14 @@ function camouDrawTracklist() {
 
   // Unruhiger, handgezeichneter Orbit als visuelle Klammer.
   ctx.save();
-  ctx.strokeStyle = "rgba(224,235,220,.36)";
+  ctx.strokeStyle = "rgba(38,86,93,.43)";
   ctx.lineWidth = 1.4;
   ctx.setLineDash([3, 10, 18, 6]);
   ctx.beginPath();
   ctx.ellipse(0, 0, 350, 270, -0.24, -0.12, Math.PI * 1.83);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.strokeStyle = "rgba(224,235,220,.22)";
+  ctx.strokeStyle = "rgba(252,252,252,.42)";
   ctx.beginPath();
   ctx.ellipse(10, -2, 285, 205, 0.34, 0.25, Math.PI * 1.78);
   ctx.stroke();
@@ -6450,7 +6427,7 @@ function camouDrawTracklist() {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(0.4);
-    ctx.strokeStyle = "rgba(230,239,226,.72)";
+    ctx.strokeStyle = "rgba(192,196,122,.90)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(-size, 0);
@@ -6462,7 +6439,7 @@ function camouDrawTracklist() {
   }
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(224,235,220,.68)";
+  ctx.fillStyle = "rgba(38,86,93,.82)";
   ctx.font = "500 17px 'DM Mono', monospace";
   ctx.save();
   ctx.translate(-8, -18);
@@ -6486,18 +6463,18 @@ function camouDrawTracklist() {
     ctx.translate(track.x, track.y);
     ctx.rotate(track.r);
     ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(204,220,202,.72)";
+    ctx.fillStyle = "rgba(38,86,93,.78)";
     ctx.font = "500 15px 'DM Mono', monospace";
     if (track.n) ctx.fillText(track.n.padStart(2, "0"), -8, -21);
 
-    ctx.fillStyle = "#F2F0E8";
+    ctx.fillStyle = "#FCFCFC";
     ctx.font = `500 ${track.size}px Manrope, Arial, sans-serif`;
     ctx.shadowColor = "rgba(0,0,0,.48)";
     ctx.shadowBlur = 9;
     ctx.fillText(track.title, 18, 0, 430);
     ctx.shadowBlur = 0;
 
-    ctx.strokeStyle = "rgba(219,233,216,.45)";
+    ctx.strokeStyle = "rgba(252,252,252,.69)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(18, 17);
@@ -6510,7 +6487,7 @@ function camouDrawTracklist() {
   ctx.save();
   ctx.translate(5, 5);
   ctx.rotate(-0.18);
-  ctx.strokeStyle = "rgba(230,239,225,.58)";
+  ctx.strokeStyle = "rgba(192,196,122,.82)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(-70, -5);
@@ -6545,7 +6522,7 @@ function camouDrawCountdown() {
   ctx.textBaseline = "middle";
 
   // Offene, technische Rahmung statt einer geschlossenen Box.
-  ctx.strokeStyle = "rgba(224,236,222,.52)";
+  ctx.strokeStyle = "rgba(38,86,93,.58)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(-300, -150);
@@ -6558,22 +6535,22 @@ function camouDrawCountdown() {
   ctx.lineTo(300, 150);
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(221,234,218,.72)";
+  ctx.fillStyle = "rgba(38,86,93,.88)";
   ctx.font = "500 18px 'DM Mono', monospace";
   ctx.fillText("COUNTDOWN  /  NEXT TRANSMISSION", 0, -104);
 
-  ctx.fillStyle = "#F4F1E8";
+  ctx.fillStyle = "#FCFCFC";
   ctx.shadowColor = "rgba(0,0,0,.48)";
   ctx.shadowBlur = 12;
   ctx.font = "300 112px Manrope, Arial, sans-serif";
   ctx.fillText(String(days).padStart(2, "0"), 0, 8);
   ctx.shadowBlur = 0;
 
-  ctx.fillStyle = "rgba(226,237,222,.82)";
+  ctx.fillStyle = "rgba(38,86,93,.80)";
   ctx.font = "500 20px 'DM Mono', monospace";
   ctx.fillText("TAGE", 0, 67);
 
-  ctx.fillStyle = "#F4F1E8";
+  ctx.fillStyle = "#FCFCFC";
   ctx.font = "500 30px 'DM Mono', monospace";
   ctx.fillText(
     `${String(hours).padStart(2, "0")} : ${String(minutes).padStart(2, "0")} : ${String(seconds).padStart(2, "0")}`,
@@ -6581,7 +6558,7 @@ function camouDrawCountdown() {
     112
   );
 
-  ctx.fillStyle = "rgba(221,234,218,.70)";
+  ctx.fillStyle = "rgba(38,86,93,.78)";
   ctx.font = "500 17px 'DM Mono', monospace";
   ctx.fillText("27 . 11 . 2026", 0, 174);
 
