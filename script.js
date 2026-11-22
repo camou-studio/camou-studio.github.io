@@ -32,13 +32,11 @@ const ASSETS = {
   homeVideo: new URL("./assets/test.mp4", import.meta.url).href,
   ambientLoop: new URL("./assets/camouloop.mp3", import.meta.url).href,
   music: new URL("./assets/release.jpg", import.meta.url).href,
-  visuals: new URL("./assets/visuals.jpg", import.meta.url).href,
-  // Die Bildfolge im ??-Player entspricht genau den vier Assets.
+  visuals: new URL("./assets/visuals-04.jpg", import.meta.url).href,
+  // Nur zwei Bilder; die Reihenfolge ist bewusst 04 -> 03.
   visualSlides: [
-    new URL("./assets/visuals.jpg", import.meta.url).href,
-    new URL("./assets/visuals-01.jpg", import.meta.url).href,
-    new URL("./assets/visuals-03.jpg", import.meta.url).href,
-    new URL("./assets/visuals-04.jpg", import.meta.url).href
+    new URL("./assets/visuals-04.jpg", import.meta.url).href,
+    new URL("./assets/visuals-03.jpg", import.meta.url).href
   ],
   archive: new URL("./assets/archive.jpg", import.meta.url).href
 };
@@ -1037,6 +1035,7 @@ let sceneNeedsRender = true;
 
 let visualImages = [];
 let visualIndex = 0;
+let camouVisualLinkHover = false;
 let visualNavPointer = null;
 let visualNavMoved = false;
 let visualNavStartX = 0;
@@ -2282,10 +2281,16 @@ function camouCRTDrawWarpedImage(ctx, image, x, y, w, h) {
   }
 }
 
+// Nur Anzeigenamen. Die Bilddateien im assets-Ordner bleiben JPGs.
+const CAMOU_VISUAL_DISPLAY_NAMES = [
+  "ich_habe_schmerzen420.png",
+  "untitl3d_l1nk.png"
+];
+const CAMOU_VISUAL_LINK_URL =
+  "https://untitled.stream/invite/qLHAwMqU2UFsojmx0cOQT";
+
 function camouVisualSlideName(index = visualIndex) {
-  const path = ASSETS.visualSlides[index] || "";
-  const clean = path.split("?")[0];
-  return clean.split("/").pop() || `bild-${index + 1}.jpg`;
+  return CAMOU_VISUAL_DISPLAY_NAMES[index] || "Fotoanzeige";
 }
 
 function camouDrawViewerNavButton(ctx, x, y, radius, direction) {
@@ -2391,7 +2396,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ctx.font = "600 12px Segoe UI, Arial, sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("Windows-Fotoanzeige", bodyX + 18, bodyY + titleBarH / 2 + 1);
+  ctx.fillText("Fotoanzeige", bodyX + 18, bodyY + titleBarH / 2 + 1);
 
   const titleDots = ["#8BC67C", "#E1C565", "#D98A8E"];
   titleDots.forEach((color, i) => {
@@ -2468,10 +2473,30 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
   ctx.textAlign = "center";
   ctx.fillText(`${String(visualIndex + 1)} / ${String(visualImages.length)}`, cx, buttonY + 34);
 
+  // Dateiname in der dunklen Titelleiste: Bild 2 besitzt einen echten Link.
+  // Die Farbe wird beim Hover in der Canvas-Textur aktualisiert.
   ctx.textAlign = "left";
   ctx.font = "400 10.5px Segoe UI, Arial, sans-serif";
-  ctx.fillStyle = "#59636F";
-  ctx.fillText(camouVisualSlideName(), photoX + 3, photoY - 7);
+  const filenameText = camouVisualSlideName();
+  const filenameX = photoX + 3;
+  const filenameY = photoY - 7;
+  const linkedFilename = visualIndex === 1;
+  ctx.fillStyle = linkedFilename && camouVisualLinkHover
+    ? "#65B9FF"
+    : "#EFF3F7";
+  ctx.fillText(filenameText, filenameX, filenameY);
+
+  // Ein feiner Unterstrich kennzeichnet den Link, ohne das Retro-Layout
+  // des Fensters zu veraendern.
+  if (linkedFilename) {
+    const labelWidth = ctx.measureText(filenameText).width;
+    ctx.strokeStyle = camouVisualLinkHover ? "#65B9FF" : "rgba(239,243,247,.65)";
+    ctx.lineWidth = .8;
+    ctx.beginPath();
+    ctx.moveTo(filenameX, filenameY + 6);
+    ctx.lineTo(filenameX + labelWidth, filenameY + 6);
+    ctx.stroke();
+  }
 
   ctx.textAlign = "right";
   ctx.fillStyle = "#7A8692";
@@ -2508,6 +2533,7 @@ function cycleVisualSlide(direction) {
     visualIndex = (
       visualIndex + direction + visualImages.length
     ) % visualImages.length;
+    camouVisualLinkHover = false;
     refreshVisualsTexture();
   };
 
@@ -2865,7 +2891,7 @@ function refreshEchoesTexture() {
 
 
 async function createGlobeTexture() {
-  // Die vier VISUALS-Slides behalten feste Positionen.
+  // Die zwei VISUALS-Slides behalten ihre feste Reihenfolge.
   // Der erste Slide wird erst nach HOME geladen.
   visualImages = new Array(ASSETS.visualSlides.length).fill(null);
   visualIndex = 0;
@@ -3624,6 +3650,42 @@ const CAMOU_VISUAL_VIEWER = Object.freeze({
   navGap: 68
 });
 
+// Hitbox des Links in derselben lokalen Texturkoordinate wie die
+// Fotoanzeige. Damit stimmen Klickposition und sichtbarer Text auch
+// auf der gedrehten Globusoberflaeche ueberein.
+function camouVisualFilenameHit(point) {
+  if (visualIndex !== 1 || camouWorldMode !== "camou") return false;
+  const q = photoPoint(point, 2);
+  if (!q) return false;
+
+  const x = q.x / CONFIG.visualScale;
+  const y = q.y / CONFIG.visualScale;
+  const filenameX = -CAMOU_VISUAL_VIEWER.bodyWidth / 2
+    + CAMOU_VISUAL_VIEWER.photoInsetX + 3;
+  const filenameY = CAMOU_VISUAL_VIEWER.bodyY
+    + CAMOU_VISUAL_VIEWER.photoInsetTop - 7;
+
+  const canvas = CAMOU_V2_CANVASES[2];
+  const context = canvas?.getContext("2d");
+  let labelWidth = 112;
+  if (context) {
+    context.save();
+    context.font = "400 10.5px Segoe UI, Arial, sans-serif";
+    labelWidth = context.measureText(CAMOU_VISUAL_DISPLAY_NAMES[1]).width;
+    context.restore();
+  }
+
+  return x >= filenameX - 8 && x <= filenameX + labelWidth + 12 &&
+    y >= filenameY - 14 && y <= filenameY + 14;
+}
+
+function camouSetVisualLinkHover(active) {
+  const next = Boolean(active);
+  if (camouVisualLinkHover === next) return;
+  camouVisualLinkHover = next;
+  refreshVisualsTexture();
+}
+
 function camouVisualNavDirectionAt(point) {
   const q = photoPoint(point, 2);
 
@@ -3650,6 +3712,12 @@ function handleGlobeClick(event) {
   const point = texturePoint(event);
 
   if (!point) return;
+
+  // Nur beim zweiten Bild ist der angezeigte Dateiname ein Hyperlink.
+  if (camouVisualFilenameHit(point)) {
+    window.open(CAMOU_VISUAL_LINK_URL, "_blank", "noopener,noreferrer");
+    return;
+  }
 
   // Spotify: ausschliesslich der unterstrichene FRAGMENTE-Titel ist klickbar.
   if (camouMusicTitleHit(point)) {
@@ -5522,15 +5590,22 @@ function camouContactTitleHit(point) {
 // Auch die Mausform zeigt die Klickbarkeit des Canvas-Titels an.
 renderer.domElement.addEventListener("pointermove", event => {
   if (isDragging || camouWorldFlight || camouWorldMode !== "camou") {
+    camouSetVisualLinkHover(false);
     renderer.domElement.style.cursor = "";
     return;
   }
+
   const point = texturePoint(event);
+  const overVisualLink = camouVisualFilenameHit(point);
+  camouSetVisualLinkHover(overVisualLink);
+
   renderer.domElement.style.cursor = (
+    overVisualLink || camouVisualNavDirectionAt(point) ||
     camouMusicTitleHit(point) || camouContactTitleHit(point)
   ) ? "pointer" : "";
 });
 renderer.domElement.addEventListener("pointerleave", () => {
+  camouSetVisualLinkHover(false);
   renderer.domElement.style.cursor = "";
 });
 
