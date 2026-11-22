@@ -32,11 +32,12 @@ const ASSETS = {
   homeVideo: new URL("./assets/test.mp4", import.meta.url).href,
   music: new URL("./assets/release.jpg", import.meta.url).href,
   visuals: new URL("./assets/visuals.jpg", import.meta.url).href,
+  // Die Bildfolge im ??-Player entspricht genau den vier Assets.
   visualSlides: [
     new URL("./assets/visuals.jpg", import.meta.url).href,
     new URL("./assets/visuals-01.jpg", import.meta.url).href,
-    new URL("./assets/visuals-02.jpg", import.meta.url).href,
-    new URL("./assets/visuals-03.jpg", import.meta.url).href
+    new URL("./assets/visuals-03.jpg", import.meta.url).href,
+    new URL("./assets/visuals-04.jpg", import.meta.url).href
   ],
   archive: new URL("./assets/archive.jpg", import.meta.url).href
 };
@@ -4551,6 +4552,10 @@ const CAMOU_V2_SCALE = mobile ? 0.00222 : 0.00296;
 const CAMOU_MOBILE_SIDE_SCALE = 0.80;
 const CAMOU_HOME_VIDEO_SCALE = mobile ? 1.10 : 1.20;
 
+// Der gesamte ??-Inhalt (Titel, Untertitel, TV, Hebel) wandert leicht
+// nach rechts oben. Die gebogene Flaeche und die Navigation bleiben gleich.
+const CAMOU_VISUALS_OFFSET = Object.freeze({ x: 52, y: -42 });
+
 const CAMOU_V2_CANVASES = [];
 const CAMOU_V2_TEXTURES = [];
 const CAMOU_V2_MESHES = [];
@@ -5028,9 +5033,12 @@ drawPanel = function(ctx, index, image) {
   const p = PLACES[index];
   const section = sections[index];
 
-  const side = index === 1;
-
   ctx.save();
+
+  if (index === 2) {
+    // Titel, Beschreibung, TV und Hebel gemeinsam versetzen.
+    ctx.translate(CAMOU_VISUALS_OFFSET.x, CAMOU_VISUALS_OFFSET.y);
+  }
 
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -5069,23 +5077,20 @@ if (index === 1 || index === 4) {
   ctx.fillStyle = "rgba(252,252,252,.97)";
 
   if (index === 1) {
-    // FRAGMENTE: Sechs Originalabschnitte, bei Bedarf weich umbrochen.
-    // Der Text bleibt neben dem Titel. Auf kleinen Displays wird die
-    // bisherige hochkante Ausrichtung beibehalten.
+    // FRAGMENTE: Das Gedicht beginnt bewusst weit unter dem Linktitel.
+    // Der Abstand entspricht ungefaehr 25 kleinen Textzeilen. Die Schrift
+    // liegt auf allen Geraeten um 90 Grad nach links gedreht und wird
+    // weiterhin sauber umbrochen, ohne die Flaeche zu verlassen.
     ctx.save();
-    if (mobile) {
-      ctx.translate(210, 105);
-      ctx.rotate(Math.PI / 2);
-    } else {
-      ctx.translate(p.textX, 112);
-    }
+    ctx.translate(mobile ? 72 : 85, mobile ? 270 : 272);
+    ctx.rotate(-Math.PI / 2);
     camouDrawParagraphBlock(ctx, section.body, {
-      maxWidth: mobile ? 375 : 415,
-      maxHeight: mobile ? 345 : 405,
-      fontSize: mobile ? 19.5 : 21.5,
-      minFontSize: mobile ? 16 : 17,
-      leading: 1.24,
-      paragraphGap: 5
+      maxWidth: mobile ? 180 : 190,
+      maxHeight: mobile ? 415 : 440,
+      fontSize: mobile ? 17.5 : 19,
+      minFontSize: mobile ? 14.5 : 15.5,
+      leading: 1.17,
+      paragraphGap: 6
     });
     ctx.restore();
 
@@ -5279,9 +5284,13 @@ photoPoint = function(point, index) {
 
   const p = PLACES[index];
 
-  const dx = local.x - p.imageX;
+  // Die Klickkoordinaten um denselben ??-Versatz wie beim Zeichnen
+  // korrigieren; insbesondere bleibt der TV-Hebel exakt bedienbar.
+  const shiftX = index === 2 ? CAMOU_VISUALS_OFFSET.x : 0;
+  const shiftY = index === 2 ? CAMOU_VISUALS_OFFSET.y : 0;
+  const dx = local.x - p.imageX - shiftX;
   const imageY = mobile && index === 1 ? 150 : 112;
-  const dy = local.y - imageY;
+  const dy = local.y - imageY - shiftY;
 
   const c = Math.cos(p.photoR);
   const s = Math.sin(p.photoR);
@@ -5678,6 +5687,10 @@ function camouCreateRockyWorldTexture() {
 
   ctx.putImageData(image, 0, 0);
 
+  // Die vier Saetze sitzen direkt auf der kugelfoermigen Textur.
+  // Man entdeckt sie an unterschiedlichen Stellen beim Drehen des Planeten.
+  camouDrawSecondPlanetScatteredText(ctx, width, height);
+
   const texture = new THREE.CanvasTexture(
     canvas
   );
@@ -5696,38 +5709,68 @@ function camouCreateRockyWorldTexture() {
 
 
 /* =========================================
-   INHALT DES ZWEITEN PROJEKTS
+   ZWEITER PLANET: TEXTE UEBER DIE GESAMTE KUGEL
 ========================================= */
 
-function camouDrawSecondProject(ctx) {
-  ctx.clearRect(0, 0, CAMOU_V2_W, CAMOU_V2_H);
+function camouDrawSecondPlanetScatteredText(ctx, width, height) {
+  // Jede Schrift erscheint genau einmal, aber an einer eigenen Position.
+  // Die Ausgangspunkte sind gleichmaessig ueber 360 Grad verteilt; die
+  // kleine, reproduzierbare Zufallsabweichung macht die Anordnung organisch.
+  const fragments = [
+    { text: "mach kein auge", u: .24, v: .33, size: 28, width: 200, tilt: -.11 },
+    { text: "detaillreiche qualität braucht seine zeit ja", u: .49, v: .71, size: 22, width: 246, tilt: .10 },
+    { text: "der nächste planet wird angesteuert!", u: .73, v: .29, size: 23, width: 247, tilt: -.07 },
+    { text: "mal sehen wo der wind mich hinweht >.<", u: .94, v: .70, size: 22, width: 240, tilt: .13 }
+  ];
+
+  let randomSeed = 0xC42026;
+  const jitter = () => {
+    randomSeed = (Math.imul(randomSeed, 1664525) + 1013904223) >>> 0;
+    return randomSeed / 4294967296 - .5;
+  };
+
+  const scale = width / 768;
   ctx.save();
-  ctx.translate(CAMOU_V2_W / 2, CAMOU_V2_H / 2);
-  ctx.fillStyle = "#FCFCFC";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  ctx.lineJoin = "round";
 
-  // Nur der neue Text; keine alten Projekttitel oder Hinweisschriften.
-  // Zwei vorgegebene Absaetze, optisch sanft umbrochen wo noetig.
-  camouDrawParagraphBlock(ctx, [
-    "mach kein auge, detaillreiche quallität braucht seine zeit ja",
-    "der nächste planet wird angesteuert! mal sehen wo der wind mich hinträgt >.<"
-  ], {
-    maxWidth: 795,
-    maxHeight: 310,
-    fontSize: mobile ? 30 : 34,
-    minFontSize: 23,
-    leading: 1.45,
-    paragraphGap: 26
-  });
+  for (const fragment of fragments) {
+    const x = (fragment.u + jitter() * .025) * width;
+    const y = (fragment.v + jitter() * .032) * height;
+    const angle = fragment.tilt + jitter() * .04;
+    const fontSize = fragment.size * scale;
+    const maxWidth = fragment.width * scale;
+    ctx.font = `500 ${fontSize}px Manrope, Arial, sans-serif`;
+    const lines = camouWrapParagraph(ctx, fragment.text, maxWidth);
+    const leading = fontSize * 1.27;
 
+    // An der 0/360-Grad-Naht wird der Schriftblock gespiegelt gezeichnet,
+    // damit kein Wort bei der Umdrehung abrupt abbricht.
+    for (const wrapX of [-width, 0, width]) {
+      ctx.save();
+      ctx.translate(x + wrapX, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = "rgba(252,252,252,.96)";
+      ctx.strokeStyle = "rgba(65,39,53,.38)";
+      ctx.lineWidth = 1.1 * scale;
+      ctx.shadowColor = "rgba(53,34,45,.36)";
+      ctx.shadowBlur = 5 * scale;
+
+      lines.forEach((line, i) => {
+        const baseline = (i - (lines.length - 1) / 2) * leading;
+        ctx.strokeText(line, 0, baseline, maxWidth);
+        ctx.fillText(line, 0, baseline, maxWidth);
+      });
+      ctx.restore();
+    }
+  }
   ctx.restore();
 }
 
 /* =========================================
    ZWEITEN PLANETEN BEI BEDARF ERSTELLEN
 ========================================= */
-let camouSecondPlanetPanel = null;
-let camouSecondPlanetPanelTexture = null;
-
 function camouEnsureSecondPlanet() {
   if (camouSecondPlanetReady) {
     return camouSecondPlanetReady;
@@ -5760,51 +5803,11 @@ sphere.renderOrder = 0;
 
 group.add(sphere);
 
-      const canvas = document.createElement("canvas");
-      canvas.width = CAMOU_V2_W;
-      canvas.height = CAMOU_V2_H;
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.colorSpace = THREE.SRGBColorSpace;
-
-      const panel = new THREE.Mesh(
-        camouV2Geometry({
-          lon: 0,
-          lat: 0,
-          tiltR: 0
-        }),
-       
-new THREE.MeshBasicMaterial({
-  map: texture,
-  transparent: true,
-  opacity: 0,
-
-  // Die Kugel verdeckt den Inhalt
-  // auf ihrer Rueckseite.
-  depthTest: true,
-  depthWrite: false,
-  side: THREE.DoubleSide
-})
-);
-
-panel.renderOrder = 2;
-panel.visible = false;
-
-      group.add(panel);
-
-      camouDrawSecondProject(canvas.getContext("2d"));
-
-      texture.needsUpdate = true;
-
       group.visible = false;
       scene.add(group);
-
       camouSecondPlanetGroup = group;
-      camouSecondPlanetPanel = panel;
-      camouSecondPlanetPanelTexture = texture;
 
-      // Keine Bilddatei notwendig: der Planet zeigt ausschliesslich Text.
-      texture.needsUpdate = true;
+      // Keine Bilddatei noetig: die Texte sind Teil der Planetenoberflaeche.
       sceneNeedsRender = true;
       return group;
     });
@@ -6224,9 +6227,6 @@ camouSecondPlanetGroup.scale.setScalar(
 
 globeGroup.visible = true;
 camouSetGlobeFlightOpacity(1);
-
-    camouSecondPlanetPanel.visible = true;
-    camouSecondPlanetPanel.material.opacity = 1;
 
     camouPlanet.visible = true;
     camouPlanet.material.opacity = 1;
@@ -6776,17 +6776,10 @@ function camouDrawTracklist() {
     ctx.restore();
   }
 
-  ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(38,86,93,.82)";
-  ctx.font = "500 17px 'DM Mono', monospace";
-  ctx.save();
-  ctx.translate(-8, -18);
-  ctx.rotate(-0.08);
-  ctx.fillText("TRACKS / FRAGMENTE", 0, 0);
-  ctx.restore();
+  // Die alte Ueberschrift TRACKS / FRAGMENTE wird nicht mehr gezeichnet.
 
   const tracks = [
-    { n: "3", title: "verstand gg. Leib", x: -205, y: -175, r: -0.10, size: 29 },
+    { n: "3", title: "verstand gg. leib", x: -205, y: -175, r: -0.10, size: 29 },
     { n: "2", title: "mfg", x: 70, y: -255, r: 0.13, size: 35 },
     { n: "7", title: "SCHOTTER", x: 250, y: -145, r: -0.16, size: 31 },
     { n: "5", title: "06:00, 06:05, 06:10, 06:15…", x: 245, y: 55, r: 0.08, size: 18 },
