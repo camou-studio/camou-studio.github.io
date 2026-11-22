@@ -127,50 +127,149 @@ const navButtons = [
 ];
 
 /* =========================================
-   ORGANISCHE MENUE-OVERLAYS (OBEN / UNTEN)
-   Es werden ausschliesslich Hintergruende gesetzt.
+   MENUE-OVERLAYS / MITTIGE NAVIGATION
+   Das bestehende HTML bleibt unveraendert.
 ========================================= */
 const CAMOU_MENU_BACKGROUND = [
-  // Sanfte, unregelmaessige Aufhellungen, darunter das gedeckte Rosa #E37383.
-  "radial-gradient(ellipse 33% 190% at 9% -12%, rgba(255,255,255,.39) 0%, rgba(255,255,255,.14) 49%, transparent 95%)",
-  "radial-gradient(ellipse 31% 210% at 54% 120%, rgba(255,255,255,.31) 0%, rgba(255,255,255,.08) 53%, transparent 100%)",
-  "radial-gradient(ellipse 25% 220% at 95% 5%, rgba(255,255,255,.27) 0%, transparent 90%)",
-  "linear-gradient(108deg, #E37383 0%, #EB8D9B 26%, #E77C8B 58%, #F0A0AA 82%, #E37383 100%)"
+  // Silber-Grau mit papierweissen, organischen Aufhellungen.
+  "radial-gradient(ellipse 35% 200% at 8% -10%, rgba(255,255,255,.31) 0%, rgba(255,255,255,.08) 52%, transparent 95%)",
+  "radial-gradient(ellipse 37% 210% at 53% 115%, rgba(255,255,255,.25) 0%, rgba(255,255,255,.05) 52%, transparent 98%)",
+  "radial-gradient(ellipse 30% 185% at 97% 7%, rgba(255,255,255,.22) 0%, transparent 88%)",
+  "linear-gradient(110deg, #92999E 0%, #AEB3B7 28%, #969DA2 60%, #B1B7BA 84%, #92999E 100%)"
 ].join(", ");
+
+// Nur die beiden Menueleisten und deren Navigationslinks formatieren.
+// Andere Schriften, Videos oder die Textur der Kugel bleiben unberuehrt.
+function camouInjectMenuStyles() {
+  if (document.getElementById("camou-menu-style")) return;
+  const style = document.createElement("style");
+  style.id = "camou-menu-style";
+  style.textContent = `
+    .camou-menu-shell,
+    .camou-menu-shell a,
+    .camou-menu-shell button,
+    .camou-menu-shell span {
+      color: #FCFCFC !important;
+    }
+    .camou-menu-shell .nav-link,
+    .camou-menu-shell .nav-link:link,
+    .camou-menu-shell .nav-link:visited {
+      color: #FCFCFC !important;
+      transition: color .2s ease;
+    }
+    .camou-menu-shell .nav-link.active,
+    .camou-menu-shell .nav-link:hover,
+    .camou-menu-shell .nav-link:focus-visible {
+      color: #88C8C8 !important;
+      border-bottom-color: #88C8C8 !important;
+    }
+    .camou-menu-shell .nav-link.active::after,
+    .camou-menu-shell .nav-link:hover::after,
+    .camou-menu-shell .nav-link:focus-visible::after {
+      background-color: #88C8C8 !important;
+      border-color: #88C8C8 !important;
+    }
+    @media (min-width: 901px) {
+      .camou-nav-centered {
+        position: fixed !important;
+        left: 50vw !important;
+        top: var(--camou-nav-center-y, 40px) !important;
+        transform: translate(-50%, -50%) !important;
+        width: max-content !important;
+        max-width: calc(100vw - 230px);
+        margin: 0 !important;
+        z-index: 50 !important;
+        white-space: nowrap !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 function camouSetMenuBackground(bar) {
   if (!bar || bar === document.body || bar === stage) return;
+  bar.classList.add("camou-menu-shell");
   bar.style.setProperty("background", CAMOU_MENU_BACKGROUND, "important");
 }
 
 function camouFindBarFrom(element, atTop) {
-  // Fallback fuer Menueleisten, die keine header/footer-Tags benutzen.
+  // Fallback fuer Menueleisten ohne header- / footer-Tags.
   for (let node = element; node && node !== document.body; node = node.parentElement) {
     const box = node.getBoundingClientRect();
     const view = window.innerWidth;
-    if (box.width < view * 0.76 || box.height < 35 || box.height > 150) continue;
+    if (box.width < view * .76 || box.height < 35 || box.height > 150) continue;
     if (atTop && box.top >= -10 && box.top < 130) return node;
     if (!atTop && box.bottom >= window.innerHeight - 160) return node;
   }
   return null;
 }
 
-// Das alleinstehende PROJECT-Label oben rechts entfernen, nicht
-// die Navigation oder Projekttexte auf dem Globus.
 function camouRemoveTopProjectLabel(header) {
   const bar = header || camouFindBarFrom($("logo"), true);
   if (!bar) return;
-
   for (const node of bar.querySelectorAll("a, button, span, small, p, div")) {
     if (node.children.length && !node.matches("a, button")) continue;
     if (node.textContent.trim().toLowerCase() !== "project") continue;
-
     const rect = node.getBoundingClientRect();
     if (rect.top < -5 || rect.top > 175 || rect.left < window.innerWidth * .65) continue;
-
-    const label = node.closest("a, button") || node;
-    label.remove();
+    (node.closest("a, button") || node).remove();
   }
+}
+
+// Das Logo wird als vorhandenes DOM-Element weiterverwendet, damit
+// seine Typografie, Verlinkung und die bisherigen Klicks erhalten bleiben.
+function camouRemoveLogoPeriod() {
+  const logo = $("logo");
+  if (!logo || !/camou\.\s*$/i.test(logo.textContent)) return;
+  const walker = document.createTreeWalker(logo, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    if (!nodes[i].nodeValue.trim()) continue;
+    nodes[i].nodeValue = nodes[i].nodeValue.replace(/\.([\s]*)$/, "$1");
+    break;
+  }
+}
+
+function camouShortenFooterCredit(footer) {
+  if (!footer || !/b3nn3t/i.test(footer.textContent) ||
+      !/independent artist/i.test(footer.textContent)) return;
+  const walker = document.createTreeWalker(footer, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (let i = 0; i < nodes.length; i++) {
+    const before = nodes[i].nodeValue;
+    if (!/independent artist/i.test(before)) continue;
+    nodes[i].nodeValue = before.replace(/\s*[-–—]?\s*independent artist\b/gi, "");
+    // Auch bei getrennten HTML-Spans den alleinstehenden Bindestrich entfernen.
+    for (let j = i - 1; j >= 0; j--) {
+      if (!nodes[j].nodeValue.trim()) continue;
+      nodes[j].nodeValue = nodes[j].nodeValue.replace(/\s*[-–—]\s*$/, "");
+      break;
+    }
+  }
+}
+
+function camouFindNavGroup(header) {
+  if (!header || navButtons.length < 2) return null;
+  let node = navButtons[0].parentElement;
+  while (node && node !== header) {
+    if (navButtons.every(button => node.contains(button)) &&
+        !node.contains($("logo"))) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function camouCenterNav(header) {
+  const nav = camouFindNavGroup(header);
+  if (!nav) return;
+  nav.classList.add("camou-nav-centered");
+  // Die feste Position ist unabhaengig von der Spalten-/Flexverteilung
+  // des Headers. Die Hoehe folgt bei Resize/Scroll dem realen Balken.
+  const rect = header.getBoundingClientRect();
+  const mid = rect.top + rect.height / 2;
+  document.documentElement.style.setProperty("--camou-nav-center-y", `${mid}px`);
 }
 
 function camouApplyMenuBackgrounds() {
@@ -186,15 +285,21 @@ function camouApplyMenuBackgrounds() {
     false
   );
 
+  camouInjectMenuStyles();
   camouSetMenuBackground(header);
   camouSetMenuBackground(footer);
   camouRemoveTopProjectLabel(header);
+  camouRemoveLogoPeriod();
+  camouShortenFooterCredit(footer);
+  camouCenterNav(header);
 }
 
 camouApplyMenuBackgrounds();
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", camouApplyMenuBackgrounds, { once: true });
 }
+window.addEventListener("resize", camouApplyMenuBackgrounds, { passive: true });
+window.addEventListener("scroll", camouApplyMenuBackgrounds, { passive: true });
 
 const mobile = window.matchMedia(
   "(hover: none) and (pointer: coarse)"
@@ -250,6 +355,12 @@ function camouCreateUsedPaperTexture() {
   smear(.12, .54, .25, .32, "214,220,226", .35,  .35);
   smear(.53, .93, .41, .17, "237,237,222", .22, -.08);
 
+  // Sanfte hellgraue Zeichen- und Abriebspuren neben den blauen Pigmenten.
+  smear(.23, .21, .19, .13, "164,171,176", .23, -.30);
+  smear(.78, .58, .16, .22, "178,182,187", .28,  .26);
+  smear(.47, .87, .26, .11, "156,162,166", .21, -.18);
+  smear(.90, .32, .14, .13, "188,192,196", .26,  .32);
+
   // Schwache, durch Verwischen entstandene Striche statt klarer Flecken.
   for (let i = 0; i < 15; i++) {
     const t = i / 14;
@@ -292,7 +403,10 @@ function camouCreateUsedPaperTexture() {
     { x: .79, y: .17, spreadX: .21, spreadY: .09, angle:  .42, rgb: "168,205,244", opacity: .11 },
     { x: .70, y: .84, spreadX: .25, spreadY: .08, angle: -.16, rgb: "237,237,222", opacity: .16 },
     { x: .26, y: .82, spreadX: .15, spreadY: .08, angle:  .20, rgb: "247,247,215", opacity: .13 },
-    { x: .59, y: .46, spreadX: .12, spreadY: .07, angle: -.55, rgb: "214,220,226", opacity: .08 }
+    { x: .59, y: .46, spreadX: .12, spreadY: .07, angle: -.55, rgb: "214,220,226", opacity: .08 },
+    { x: .26, y: .21, spreadX: .16, spreadY: .07, angle: -.34, rgb: "150,155,159", opacity: .20 },
+    { x: .74, y: .61, spreadX: .17, spreadY: .10, angle:  .26, rgb: "172,178,181", opacity: .22 },
+    { x: .44, y: .87, spreadX: .22, spreadY: .06, angle: -.19, rgb: "161,166,170", opacity: .19 }
   ];
 
   for (const area of wearAreas) {
@@ -316,7 +430,7 @@ function camouCreateUsedPaperTexture() {
   }
 
   // Winzige, unregelmaessige Papierfasern; keine grossen sichtbaren Punkte.
-  const dustTones = ["214,220,226", "237,237,222", "168,205,244", "247,247,215"];
+  const dustTones = ["214,220,226", "237,237,222", "168,205,244", "247,247,215", "170,174,178"];
   for (let k = 0; k < 2100; k++) {
     const px = wearRandom() * w;
     const py = wearRandom() * h;
@@ -2483,25 +2597,8 @@ function drawPanel(ctx, index, image) {
   ctx.save();
   ctx.textAlign = "center";
 
-  // Dezente Linie statt rechteckiger Bereichsgrenze.
-  ctx.strokeStyle = "rgba(192,196,122,.45)";
-  ctx.lineWidth = 1.5;
-
-  ctx.beginPath();
-  ctx.moveTo(textX - 105, -351);
-  ctx.lineTo(textX + 105, -351);
-  ctx.stroke();
-
-  // Kategorie.
-  ctx.fillStyle = "rgba(252,252,252,.83)";
-  ctx.font = "500 19px 'DM Mono', monospace";
-
-  ctx.fillText(
-    section.eyebrow,
-    textX,
-    -318,
-    610
-  );
+  // Die kleinen Bereichstitel (z. B. "02 - RELEASES") und
+  // ihre Trennlinien entfallen auf saemtlichen Globus-Flaechen.
 
   // Titel.
   ctx.fillStyle = "#FCFCFC";
@@ -2562,8 +2659,8 @@ function drawPanel(ctx, index, image) {
       p.imageX
     );
   } else {
-    // Home und Music. CONTACT besitzt keine Bildflaeche.
-    if (index !== 4) paintPhoto(ctx, index, image);
+    // Legacy-Pfad: V2 zeichnet die eigentlichen 3D-Inhalte.
+    if (index === 0) paintPhoto(ctx, index, image);
   }
 
   // Kleine Sektionsnummer.
@@ -2793,8 +2890,9 @@ function camouPrepareSection(index) {
 
   state.promise = (async () => {
 
-    if (index === 3 || index === 4) {
-      // ECHOES braucht nur den Kompass, CONTACT nur den Textlink.
+    if (index === 1 || index === 3 || index === 4) {
+      // MUSIC ist jetzt nur noch ein Textlink; ECHOES nutzt den Kompass,
+      // CONTACT ebenfalls ausschliesslich Text.
       await camouWaitForPaintSlot(state);
 
       if (!CAMOU_V2_CANVASES[index]) {
@@ -2866,7 +2964,7 @@ function camouPrioritizeSection(index) {
     drawWrappedPanel(
       globeContext,
       index,
-      index === 2 || index === 3 || index === 4
+      index === 1 || index === 2 || index === 3 || index === 4
         ? null
         : camouPendingPhoto
     );
@@ -3433,8 +3531,8 @@ function handleGlobeClick(event) {
 
   if (!point) return;
 
-  // Spotify.
-  if (inImage(point, 1)) {
+  // Spotify: ausschliesslich der unterstrichene FRAGMENTE-Titel ist klickbar.
+  if (camouMusicTitleHit(point)) {
     openSpotifyModal();
     return;
   }
@@ -4831,36 +4929,8 @@ drawPanel = function(ctx, index, image) {
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
-   /* Kleine Bereichsbezeichnungen */
-/* =========================================
-   TEXTE UND INHALTE
-========================================= */
-
-  if (CAMOU_V2_SHOW_LABELS) {
-    ctx.fillStyle =
-  "rgba(252,252,252,.85)";
-    ctx.lineWidth = 1.5;
-
-    ctx.beginPath();
-
-    ctx.moveTo(-105, -345);
-    ctx.lineTo(105, -345);
-
-    ctx.stroke();
-
-    ctx.font =
-      "500 19px 'DM Mono', monospace";
-
-    ctx.fillStyle =
-      "rgba(252,252,252,.85)";
-
-    ctx.fillText(
-      section.eyebrow,
-      0,
-      -315,
-      720
-    );
-  }
+  // Keine kleinen Bereichstitel, Nummern oder Trennlinien auf dem Globus.
+  // Der Titel ist direkt lesbar, unabhaengig von Drehung oder Zoom.
 
   /* Haupttitel */
 
@@ -4871,9 +4941,10 @@ const titleY = index === 3 ? -262 : -217;
 const titleX = -12;
 ctx.fillText(section.title[0], titleX, titleY, 820);
 
-if (index === 4) {
-  // CONTACT: Der Titel selbst ist die anklickbare, sichtbare Verknuepfung.
-  const titleWidth = ctx.measureText(section.title[0]).width;
+if (index === 1 || index === 4) {
+  // FRAGMENTE und CONTACT: Der jeweilige Titel ersetzt die Bild-Verlinkung.
+  // Breite wie beim durch maxWidth skalierten fillText verwenden.
+  const titleWidth = Math.min(ctx.measureText(section.title[0]).width, 820);
   ctx.save();
   ctx.strokeStyle = "#FCFCFC";
   ctx.lineWidth = 2;
@@ -5001,8 +5072,9 @@ if (side) {
 
     ctx.restore();
 
-  } else if (index !== 4) {
-    /* Home und Music: Bilder bleiben erhalten. CONTACT ist nur Text. */
+  } else if (index === 0) {
+    /* Nur HOME besitzt hier noch ein Bild / Startvideo.
+       FRAGMENTE ist jetzt ausschliesslich als Text-Link dargestellt. */
     paintPhoto(ctx, index, image);
   }
 
@@ -5156,15 +5228,8 @@ photoPoint = function(point, index) {
 ========================================= */
 
 function camouV2Tags(visible) {
-  if (CAMOU_V2_SHOW_LABELS === visible) {
-    return;
-  }
-
-  CAMOU_V2_SHOW_LABELS = visible;
-
-  CAMOU_V2_CANVASES.forEach((_, i) => {
-    refreshIsland(i);
-  });
+  // Bewusst ausgeblendet: unabhaengig von Navigation oder Gesten.
+  CAMOU_V2_SHOW_LABELS = false;
 }
 
 /* Navigation: kleine Nummern ausblenden */
@@ -5251,6 +5316,26 @@ updateIndicator();
 
 /* ENDE CAMOU – ENTDECKER-KUGEL V2 */
 
+// Text-Hitbox fuer MUSIC statt des zuvor verlinkten Coverbilds.
+// Der Bereich entspricht dem gezeichneten, zentrierten Titel.
+function camouMusicTitleHit(point) {
+  const local = islandPoint(point, 1);
+  if (!local) return false;
+  const cx = -12;
+  const baselineY = -217;
+  const measure = CAMOU_V2_CANVASES[1]?.getContext("2d");
+  let width = 640; // Fallback, falls die Schrift noch nicht geladen ist.
+  if (measure) {
+    measure.save();
+    measure.font = "300 58px Manrope, Arial";
+    width = Math.min(measure.measureText(sections[1].title[0]).width, 820);
+    measure.restore();
+  }
+  return local.x >= cx - width / 2 - 8 &&
+    local.x <= cx + width / 2 + 43 &&
+    local.y >= baselineY - 67 && local.y <= baselineY + 24;
+}
+
 // Nur der sichtbare, unterstrichene Contact-Titel ist ein Link.
 function camouContactTitleHit(point) {
   const local = islandPoint(point, 4);
@@ -5265,9 +5350,10 @@ renderer.domElement.addEventListener("pointermove", event => {
     renderer.domElement.style.cursor = "";
     return;
   }
-  renderer.domElement.style.cursor = camouContactTitleHit(texturePoint(event))
-    ? "pointer"
-    : "";
+  const point = texturePoint(event);
+  renderer.domElement.style.cursor = (
+    camouMusicTitleHit(point) || camouContactTitleHit(point)
+  ) ? "pointer" : "";
 });
 renderer.domElement.addEventListener("pointerleave", () => {
   renderer.domElement.style.cursor = "";
