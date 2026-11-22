@@ -46,7 +46,7 @@ const sections = [
     name: "zuhause",
     eyebrow: "01 — NEW PROJECT",
     title: ["c a m O u"],
-    body: ["Gleiche Fragen.", "Neuer Cosmos."],
+    body: ["camoufleur, camoufleuse & camouflage"],
     image: ASSETS.home
   },
   {
@@ -54,10 +54,12 @@ const sections = [
     eyebrow: "02 — RELEASES",
     title: ["f r a g m e n t e"],
     body: [
-      "vom Wind getragen,",
-      "zwischen Licht und Schatten.",
-      "zwischen dem, was man sieht",
-      "und dem, was bleibt."
+      "wer weist den weg?",
+      "du bist der wind, er ist der wind, sie ist der wind.",
+      "welche farbe trägt wohl der nächste schmetterling?",
+      "federn wachsen, jeder seine eigenen. harmonieren sie?",
+      "am ende bleibst nur du, noch bevor der fittich verdirbt, bevor selbst der wind ungreifbar wird.",
+      "ein junge, und der wind."
     ],
     image: ASSETS.music
   },
@@ -65,10 +67,7 @@ const sections = [
     name: "??",
     eyebrow: "03 — VISUAL WORKS",
     title: ["??"],
-    body: [
-      "Bilder, die bleiben.",
-      "Momente, die verschwinden."
-    ],
+    body: ["???????, ???. ??!"],
     image: ASSETS.visuals
   },
   {
@@ -76,9 +75,8 @@ const sections = [
     eyebrow: "04 — HALL",
     title: ["echo"],
     body: [
-      "Songs und Spuren, die an",
-      "verschiedenen Orten widerhallen.",
-      "Click & Follow"
+      "du entscheidest wo mein",
+      "echo zu hoeren ist"
     ],
     image: ASSETS.archive
   },
@@ -87,8 +85,8 @@ const sections = [
     eyebrow: "05 — GET IN TOUCH",
     title: ["kontakt"],
     body: [
-      "Für Anfragen und Zusammenarbeit.",
-      "oder einfach so"
+      "für anfragen oder einfach so,",
+      "gib mir bisschen zeit zu antworten tho^^"
     ]
   }
 ];
@@ -193,6 +191,13 @@ function camouInjectMenuStyles() {
     .camou-menu-shell button,
     .camou-menu-shell span {
       color: #FCFCFC !important;
+    }
+    /* Sichtbare Menuepunkte stets in Kleinschreibung zeigen,
+       selbst wenn die vorhandene Seiten-CSS uppercase erzwingt. */
+    .camou-menu-shell .nav-link,
+    .camou-menu-shell .nav-link *,
+    #current-section {
+      text-transform: none !important;
     }
     .camou-menu-shell .nav-link,
     .camou-menu-shell .nav-link:link,
@@ -2274,16 +2279,7 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
 
   ctx.restore();
 
-  ctx.fillStyle = "rgba(61,66,71,.88)";
-  ctx.font = "bold 15px 'DM Mono', monospace";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  ctx.fillText(
-    "CAMOU  /  VIEWER",
-    cx,
-    bodyY + bodyH - 15
-  );
+  // Die alte CAMOU / VIEWER-Beschriftung entfaellt.
 
   const leverX = cx + iw / 2 + 43;
   const leverTop = iy + 15;
@@ -4961,6 +4957,73 @@ function camouDrawOrganicZone(ctx, index) {
   );
 }
 
+/* =========================================
+   LESBARE, UMBRECHENDE GLOBUS-TEXTE
+   Bewahrt Satzzeichen und Absatzreihenfolge.
+========================================= */
+function camouWrapParagraph(ctx, paragraph, maxWidth) {
+  const words = paragraph.trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = "";
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (current && ctx.measureText(candidate).width > maxWidth) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function camouDrawParagraphBlock(ctx, paragraphs, {
+  x = 0,
+  y = 0,
+  maxWidth = 390,
+  maxHeight = 370,
+  fontSize = 21,
+  minFontSize = 16,
+  leading = 1.30,
+  paragraphGap = 7
+} = {}) {
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  let rows = [];
+  let lineHeight = 0;
+  let height = 0;
+  let size = fontSize;
+
+  // Die Schrift nur dann reduzieren, wenn der Text andernfalls nicht passt.
+  // So bleibt die Schriftgroesse moeglichst nahe am urspruenglichen Design.
+  while (size >= minFontSize) {
+    ctx.font = `400 ${size}px Manrope, Arial, sans-serif`;
+    rows = [];
+    paragraphs.forEach((paragraph, paragraphIndex) => {
+      camouWrapParagraph(ctx, paragraph, maxWidth).forEach((line, i) => {
+        rows.push({ text: line, gapBefore: paragraphIndex > 0 && i === 0 });
+      });
+    });
+    lineHeight = size * leading;
+    height = rows.length * lineHeight +
+      Math.max(0, paragraphs.length - 1) * paragraphGap;
+    if (height <= maxHeight || size === minFontSize) break;
+    size = Math.max(minFontSize, size - 0.5);
+  }
+
+  let baseline = y - height / 2 + lineHeight / 2;
+  for (const row of rows) {
+    if (row.gapBefore) baseline += paragraphGap;
+    ctx.fillText(row.text, x, baseline, maxWidth);
+    baseline += lineHeight;
+  }
+  ctx.restore();
+}
+
 drawPanel = function(ctx, index, image) {
   const p = PLACES[index];
   const section = sections[index];
@@ -5003,74 +5066,45 @@ if (index === 1 || index === 4) {
 
   /* Beschreibung */
 
-  ctx.font = "400 22px Manrope, Arial";
+  ctx.fillStyle = "rgba(252,252,252,.97)";
 
-  ctx.fillStyle =
-  "rgba(252,252,252,.97)";
-
-if (side) {
-
-  if (mobile) {
-
-    // MUSIC: Text hochkant rechts vom Bild
-    // CONTACT: Text hochkant links vom Bild
-    const isMusic = index === 1;
-
+  if (index === 1) {
+    // FRAGMENTE: Sechs Originalabschnitte, bei Bedarf weich umbrochen.
+    // Der Text bleibt neben dem Titel. Auf kleinen Displays wird die
+    // bisherige hochkante Ausrichtung beibehalten.
     ctx.save();
-
-    ctx.translate(
-      isMusic ? 204 : -185,
-      112
-    );
-
-    ctx.rotate(
-      isMusic ? Math.PI / 2 : -Math.PI / 2
-    );
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    section.body.forEach((line, i) => {
-      ctx.fillText(
-        line,
-        0,
-        isMusic
-          ? -40 + i * 35
-          : -18 + i * 38,
-        300
-      );
+    if (mobile) {
+      ctx.translate(210, 105);
+      ctx.rotate(Math.PI / 2);
+    } else {
+      ctx.translate(p.textX, 112);
+    }
+    camouDrawParagraphBlock(ctx, section.body, {
+      maxWidth: mobile ? 375 : 415,
+      maxHeight: mobile ? 345 : 405,
+      fontSize: mobile ? 19.5 : 21.5,
+      minFontSize: mobile ? 16 : 17,
+      leading: 1.24,
+      paragraphGap: 5
     });
-
     ctx.restore();
 
   } else {
-
-    // Desktop: bisherige horizontale Darstellung
-    section.body.forEach((line, i) => {
-      ctx.fillText(
-        line,
-        p.textX,
-        6 + i * 38,
-        382
-      );
-    });
-
-  }
-
-  } else {
-    // HOME, VISUALS und ECHOES:
-    // Text oberhalb des Motivs.
-
+    // ZUHAUSE und ??: jeweils genau eine Zeile.
+    // ECHO und KONTAKT: zwei bewusst gesetzte Zeilen.
+    // Der alte Titel, das Startvideo und alle anderen Elemente bleiben stehen.
+    ctx.font = "400 22px Manrope, Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
     section.body.forEach((line, i) => {
       ctx.fillText(
         line,
         index === 4 ? -12 : p.textX,
         -140 + i * 38 - (index === 3 ? 45 : 0),
-        750
+        index === 0 ? 750 : index === 4 ? 750 : 730
       );
     });
-
-  } // Schliessende Klammer für den else-Block
+  }
 
   /* Visuals */
 
@@ -5669,25 +5703,22 @@ function camouDrawSecondProject(ctx) {
   ctx.clearRect(0, 0, CAMOU_V2_W, CAMOU_V2_H);
   ctx.save();
   ctx.translate(CAMOU_V2_W / 2, CAMOU_V2_H / 2);
-  ctx.textAlign = "center";
   ctx.fillStyle = "#FCFCFC";
 
-  ctx.font = "500 16px 'DM Mono', monospace";
-  ctx.fillText("PROJEKT 02  /  IN ENTSTEHUNG", 0, -232);
+  // Nur der neue Text; keine alten Projekttitel oder Hinweisschriften.
+  // Zwei vorgegebene Absaetze, optisch sanft umbrochen wo noetig.
+  camouDrawParagraphBlock(ctx, [
+    "mach kein auge, detaillreiche quallität braucht seine zeit ja",
+    "der nächste planet wird angesteuert! mal sehen wo der wind mich hinträgt >.<"
+  ], {
+    maxWidth: 795,
+    maxHeight: 310,
+    fontSize: mobile ? 30 : 34,
+    minFontSize: 23,
+    leading: 1.45,
+    paragraphGap: 26
+  });
 
-  ctx.font = "300 58px Manrope, Arial";
-  ctx.fillText("Eine neue Welt", 0, -105);
-
-  ctx.font = "400 21px Manrope, Arial";
-  ctx.fillText("Ein neuer Ort für Musik, Bilder und Geschichten.", 0, -30, 810);
-
-  ctx.fillStyle = "#E9C3CE";
-  ctx.font = "400 20px Manrope, Arial";
-  ctx.fillText("Hier entsteht das nächste Projekt von b3nn3t.", 0, 87, 810);
-
-  ctx.fillStyle = "rgba(252,252,252,.87)";
-  ctx.font = "400 15px 'DM Mono', monospace";
-  ctx.fillText("ZURÜCK: NAVIGATION ODER BUTTON", 0, 202);
   ctx.restore();
 }
 
@@ -6828,9 +6859,7 @@ function camouDrawCountdown() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  ctx.fillStyle = "rgba(38,86,93,.88)";
-  ctx.font = "500 18px 'DM Mono', monospace";
-  ctx.fillText("COUNTDOWN  /  NEXT TRANSMISSION", 0, -104);
+  // Die alte Countdown-Ueberschrift wurde entfernt.
 
   ctx.fillStyle = "#FCFCFC";
   ctx.shadowColor = "rgba(0,0,0,.48)";
