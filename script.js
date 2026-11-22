@@ -1037,9 +1037,11 @@ let sceneNeedsRender = true;
 
 let visualImages = [];
 let visualIndex = 0;
-let visualLeverPointer = null;
-let visualLeverMoved = false;
-let visualLeverStartY = 0;
+let visualNavPointer = null;
+let visualNavMoved = false;
+let visualNavStartX = 0;
+let visualNavStartY = 0;
+let visualNavDirection = 0;
 
 /* =========================================
    HOME VIDEO
@@ -1065,7 +1067,7 @@ let lastVideoFallbackPaint = 0;
 ========================================= */
 
 const CAMOU_AMBIENT_BASE_VOLUME = 0.30;
-const CAMOU_AMBIENT_FADE_MS = 3000;
+const CAMOU_AMBIENT_FADE_MS = 2000;
 
 const camouAmbientAudio = new Audio(ASSETS.ambientLoop);
 camouAmbientAudio.loop = true;
@@ -1098,7 +1100,7 @@ function camouPauseAmbientLoop() {
 
 function camouFadeAmbientForVideo() {
   // Start erst bei tatsaechlich laufendem Video. Der vorhandene Loop
-  // wird in DREI Sekunden stufenlos ausgeblendet und dann pausiert.
+  // wird in ZWEI Sekunden stufenlos ausgeblendet und dann pausiert.
   if (camouAmbientFadeActive || camouAmbientAudio.paused ||
       homeVideo.paused || document.hidden) return;
 
@@ -2280,397 +2282,200 @@ function camouCRTDrawWarpedImage(ctx, image, x, y, w, h) {
   }
 }
 
+function camouVisualSlideName(index = visualIndex) {
+  const path = ASSETS.visualSlides[index] || "";
+  const clean = path.split("?")[0];
+  return clean.split("/").pop() || `bild-${index + 1}.jpg`;
+}
+
+function camouDrawViewerNavButton(ctx, x, y, radius, direction) {
+  ctx.save();
+
+  const buttonGradient = ctx.createRadialGradient(
+    x - radius * .35,
+    y - radius * .45,
+    radius * .18,
+    x,
+    y,
+    radius * 1.1
+  );
+  buttonGradient.addColorStop(0, "rgba(255,255,255,.96)");
+  buttonGradient.addColorStop(.48, "rgba(236,240,244,.96)");
+  buttonGradient.addColorStop(1, "rgba(173,181,188,.98)");
+
+  ctx.fillStyle = buttonGradient;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(95,104,112,.86)";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x - radius * .32, y - radius * .36, radius * .11, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,.70)";
+  ctx.fill();
+
+  ctx.beginPath();
+  const size = radius * .56;
+  const shift = direction < 0 ? -2 : 2;
+  ctx.moveTo(x + shift - direction * size * .34, y - size * .56);
+  ctx.lineTo(x + shift + direction * size * .26, y);
+  ctx.lineTo(x + shift - direction * size * .34, y + size * .56);
+  ctx.strokeStyle = "rgba(75,84,92,.96)";
+  ctx.lineWidth = 3.2;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function drawVisualViewer(ctx, cx, iy, iw, ih) {
   const image = visualImages[visualIndex];
 
-  const bodyW = iw + 112;
-  const bodyH = ih + 100;
-
+  const bodyW = CAMOU_VISUAL_VIEWER.bodyWidth;
+  const bodyH = CAMOU_VISUAL_VIEWER.bodyHeight;
   const bodyX = cx - bodyW / 2;
-  const bodyY = iy - 50;
+  const bodyY = CAMOU_VISUAL_VIEWER.bodyY;
 
-  const windowX = cx - iw / 2 + 17;
-  const windowY = iy + 8;
-
-  const windowW = iw - 34;
-  const windowH = ih - 16;
+  const titleBarH = 28;
+  const menuBarH = 26;
+  const photoX = bodyX + CAMOU_VISUAL_VIEWER.photoInsetX;
+  const photoY = bodyY + CAMOU_VISUAL_VIEWER.photoInsetTop;
+  const photoW = bodyW - CAMOU_VISUAL_VIEWER.photoInsetX * 2;
+  const photoH = bodyH - CAMOU_VISUAL_VIEWER.photoInsetTop - CAMOU_VISUAL_VIEWER.photoInsetBottom;
+  const footerY = photoY + photoH + 12;
+  const footerH = 44;
 
   ctx.save();
-  ctx.shadowColor = "rgba(30,36,41,.36)";
+  ctx.shadowColor = "rgba(40,48,56,.20)";
   ctx.shadowBlur = 28;
-  ctx.shadowOffsetY = 13;
+  ctx.shadowOffsetY = 16;
 
-  const bodyGradient = ctx.createLinearGradient(
-    bodyX,
-    bodyY,
-    bodyX + bodyW,
-    bodyY + bodyH
-  );
-
-  // Mattes, leicht gealtertes TV-Silber statt tuerkisem Gehaeuse.
-  bodyGradient.addColorStop(0, "#F0F0ED");
-  bodyGradient.addColorStop(.18, "#D2D5D5");
-  bodyGradient.addColorStop(.55, "#9FA6AA");
-  bodyGradient.addColorStop(.82, "#BFC4C6");
-  bodyGradient.addColorStop(1, "#7D858C");
-
-  ctx.fillStyle = bodyGradient;
+  const shellGradient = ctx.createLinearGradient(bodyX, bodyY, bodyX, bodyY + bodyH);
+  shellGradient.addColorStop(0, "#F5F7FA");
+  shellGradient.addColorStop(.08, "#EAF0F7");
+  shellGradient.addColorStop(.26, "#D5DCE4");
+  shellGradient.addColorStop(.72, "#C6CED7");
+  shellGradient.addColorStop(1, "#B5BEC8");
+  ctx.fillStyle = shellGradient;
   ctx.beginPath();
-
-  ctx.roundRect(
-    bodyX, bodyY, bodyW, bodyH, 30
-  );
-
+  ctx.roundRect(bodyX, bodyY, bodyW, bodyH, 12);
   ctx.fill();
   ctx.restore();
 
   ctx.save();
-
-  ctx.strokeStyle = "rgba(252,252,250,.80)";
-  ctx.lineWidth = 3;
-
+  ctx.strokeStyle = "rgba(126,136,146,.92)";
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.roundRect(
-    bodyX, bodyY, bodyW, bodyH, 30
-  );
+  ctx.roundRect(bodyX, bodyY, bodyW, bodyH, 12);
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(63,69,73,.63)";
-  ctx.lineWidth = 2;
-
+  ctx.strokeStyle = "rgba(255,255,255,.70)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.roundRect(
-    bodyX + 7,
-    bodyY + 7,
-    bodyW - 14,
-    bodyH - 14,
-    24
-  );
+  ctx.roundRect(bodyX + 1.5, bodyY + 1.5, bodyW - 3, bodyH - 3, 10);
   ctx.stroke();
 
-  const highlight = ctx.createLinearGradient(
-    bodyX,
-    bodyY,
-    bodyX + bodyW,
-    bodyY
-  );
-
-  highlight.addColorStop(0, "rgba(255,255,255,0)");
-  highlight.addColorStop(0.25, "rgba(255,255,255,.2)");
-  highlight.addColorStop(0.75, "rgba(255,255,255,.08)");
-  highlight.addColorStop(1, "rgba(255,255,255,0)");
-
-  ctx.strokeStyle = highlight;
-  ctx.lineWidth = 2;
-
+  const titleGradient = ctx.createLinearGradient(bodyX, bodyY, bodyX, bodyY + titleBarH);
+  titleGradient.addColorStop(0, "#EFF4FA");
+  titleGradient.addColorStop(1, "#D6DEE8");
+  ctx.fillStyle = titleGradient;
   ctx.beginPath();
-  ctx.moveTo(bodyX + 32, bodyY + 10);
-  ctx.lineTo(bodyX + bodyW - 32, bodyY + 10);
-  ctx.stroke();
+  ctx.roundRect(bodyX + 1, bodyY + 1, bodyW - 2, titleBarH, 11);
+  ctx.fill();
 
-  const screws = [
-    [bodyX + 22, bodyY + 22],
-    [bodyX + bodyW - 22, bodyY + 22],
-    [bodyX + 22, bodyY + bodyH - 22],
-    [bodyX + bodyW - 22, bodyY + bodyH - 22]
-  ];
+  ctx.fillStyle = "#56606B";
+  ctx.font = "600 12px Segoe UI, Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Windows-Fotoanzeige", bodyX + 18, bodyY + titleBarH / 2 + 1);
 
-  for (const [sx, sy] of screws) {
-    ctx.fillStyle = "#646D74";
+  const titleDots = ["#8BC67C", "#E1C565", "#D98A8E"];
+  titleDots.forEach((color, i) => {
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+    ctx.arc(bodyX + bodyW - 18 - i * 13, bodyY + titleBarH / 2 + 1, 3.1, 0, Math.PI * 2);
     ctx.fill();
+  });
 
-    ctx.strokeStyle = "rgba(252,252,252,.74)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.strokeStyle = "rgba(0,0,0,.8)";
-    ctx.beginPath();
-    ctx.moveTo(sx - 3, sy + 3);
-    ctx.lineTo(sx + 3, sy - 3);
-    ctx.stroke();
-  }
-
-  const frameGradient = ctx.createLinearGradient(
-    windowX,
-    windowY,
-    windowX,
-    windowY + windowH
-  );
-
-  frameGradient.addColorStop(0, "#69747B");
-  frameGradient.addColorStop(.5, "#E7E9E8");
-  frameGradient.addColorStop(1, "#868E94");
-
-  ctx.fillStyle = frameGradient;
-
-  camouCRTScreenPath(ctx,
-    windowX - 13, windowY - 13, windowW + 26, windowH + 26);
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(252,252,252,.78)";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Gedunkelte CRT-Dichtung direkt zwischen Bild und Metall.
-  ctx.fillStyle = "rgba(45,50,55,.82)";
-  camouCRTScreenPath(ctx,
-    windowX - 6, windowY - 6, windowW + 12, windowH + 12);
-  ctx.fill();
-
-  // Dezente vertikale Lueftungsschlitze an der rechten TV-Seite.
-  ctx.save();
-  ctx.lineCap = "round";
-  for (let slot = 0; slot < 7; slot++) {
-    const x = windowX + windowW + 18;
-    const y = windowY + 42 + slot * 14;
-    ctx.strokeStyle = "rgba(63,70,77,.36)";
-    ctx.lineWidth = 2.1;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + 10, y);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Kleiner versenkter Einstellknopf (der aktive Dia-Hebel bleibt frei).
-  const tuningX = windowX + windowW + 25;
-  const tuningY = windowY + windowH - 38;
-  ctx.fillStyle = "#788188";
+  ctx.fillStyle = "#F7F9FB";
+  ctx.fillRect(bodyX + 1, bodyY + titleBarH, bodyW - 2, menuBarH);
+  ctx.strokeStyle = "rgba(171,181,191,.85)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(tuningX, tuningY, 8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(248,248,247,.76)";
-  ctx.lineWidth = 1.3;
+  ctx.moveTo(bodyX + 1, bodyY + titleBarH + menuBarH);
+  ctx.lineTo(bodyX + bodyW - 1, bodyY + titleBarH + menuBarH);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(54,61,68,.75)";
-  ctx.beginPath();
-  ctx.moveTo(tuningX, tuningY - 4);
-  ctx.lineTo(tuningX, tuningY + 2);
-  ctx.stroke();
+
+  ctx.fillStyle = "#5E6973";
+  ctx.font = "400 10.5px Segoe UI, Arial, sans-serif";
+  const menuItems = ["Datei", "Drucken", "E-Mail", "Brennen", "Öffnen"];
+  let cursor = bodyX + 14;
+  menuItems.forEach(item => {
+    ctx.fillText(item, cursor, bodyY + titleBarH + menuBarH / 2 + 0.5);
+    cursor += ctx.measureText(item).width + 18;
+  });
+
+  ctx.fillStyle = "#2A2E33";
+  ctx.fillRect(bodyX + 1, photoY - 22, bodyW - 2, 22);
+
+  ctx.fillStyle = "#F6F7F8";
+  ctx.fillRect(photoX, photoY, photoW, photoH);
+  ctx.strokeStyle = "rgba(98,108,117,.70)";
+  ctx.lineWidth = 1.35;
+  ctx.strokeRect(photoX, photoY, photoW, photoH);
 
   ctx.save();
-  camouCRTScreenPath(ctx, windowX, windowY, windowW, windowH);
+  ctx.beginPath();
+  ctx.rect(photoX + 1, photoY + 1, photoW - 2, photoH - 2);
   ctx.clip();
 
   if (image) {
-    camouCRTDrawWarpedImage(
-      ctx, image, windowX, windowY, windowW, windowH
-    );
+    cover(ctx, image, photoX, photoY, photoW, photoH);
   } else {
-    ctx.fillStyle = "#43494D";
-    ctx.fillRect(
-      windowX,
-      windowY,
-      windowW,
-      windowH
-    );
+    ctx.fillStyle = "#DDE4EB";
+    ctx.fillRect(photoX, photoY, photoW, photoH);
   }
 
-  const reflection = ctx.createLinearGradient(
-    windowX,
-    windowY,
-    windowX + windowW * 0.8,
-    windowY + windowH
-  );
-
-  reflection.addColorStop(
-    0, "rgba(255,255,255,.18)"
-  );
-  reflection.addColorStop(
-    0.35, "rgba(255,255,255,.035)"
-  );
-  reflection.addColorStop(
-    1, "rgba(255,255,255,0)"
-  );
-
-  ctx.fillStyle = reflection;
-
-  ctx.fillRect(
-    windowX,
-    windowY,
-    windowW,
-    windowH
-  );
-
-  // Gewoelbtes Glas schattet die Bildraender weich ab; die Mitte
-  // bleibt sichtbar hell. Alles bleibt in der CRT-Maske geclippt.
-  const glassDepth = ctx.createRadialGradient(
-    windowX + windowW * .43,
-    windowY + windowH * .38,
-    windowH * .09,
-    windowX + windowW * .50,
-    windowY + windowH * .52,
-    windowW * .66
-  );
-  glassDepth.addColorStop(0, "rgba(245,248,248,.06)");
-  glassDepth.addColorStop(.55, "rgba(255,255,255,0)");
-  glassDepth.addColorStop(.79, "rgba(28,34,38,.055)");
-  glassDepth.addColorStop(1, "rgba(15,22,26,.39)");
-  ctx.fillStyle = glassDepth;
-  ctx.fillRect(windowX, windowY, windowW, windowH);
-
-  // Winzige analoge Scanlines, keine auffaellige Digital-Textur.
-  ctx.strokeStyle = "rgba(20,29,34,.032)";
-  ctx.lineWidth = .55;
-  ctx.beginPath();
-  for (let yy = windowY + 2; yy < windowY + windowH; yy += 4.5) {
-    ctx.moveTo(windowX, yy);
-    ctx.lineTo(windowX + windowW, yy);
-  }
-  ctx.stroke();
-
-  // Unregelmaessiger Lichtreflex auf der KONVEXEN Glasoberflaeche.
-  ctx.beginPath();
-  ctx.moveTo(windowX + windowW * .12, windowY + windowH * .17);
-  ctx.bezierCurveTo(
-    windowX + windowW * .34, windowY - windowH * .015,
-    windowX + windowW * .61, windowY + windowH * .01,
-    windowX + windowW * .77, windowY + windowH * .12
-  );
-  ctx.strokeStyle = "rgba(250,251,251,.13)";
-  ctx.lineWidth = 2.3;
-  ctx.stroke();
-
+  const imageShade = ctx.createLinearGradient(photoX, photoY, photoX, photoY + photoH);
+  imageShade.addColorStop(0, "rgba(255,255,255,.05)");
+  imageShade.addColorStop(.7, "rgba(255,255,255,0)");
+  imageShade.addColorStop(1, "rgba(20,26,32,.10)");
+  ctx.fillStyle = imageShade;
+  ctx.fillRect(photoX, photoY, photoW, photoH);
   ctx.restore();
 
-  // The innermost glass rim follows the bowed tube outline.
-  ctx.save();
-  camouCRTScreenPath(ctx, windowX, windowY, windowW, windowH);
-  ctx.strokeStyle = "rgba(235,238,239,.34)";
-  ctx.lineWidth = 1.35;
-  ctx.stroke();
-  ctx.restore();
-
-  // Die alte CAMOU / VIEWER-Beschriftung entfaellt.
-
-  const leverX = cx + iw / 2 + 43;
-  const leverTop = iy + 15;
-  const leverBottom = iy + ih * 0.72;
-
-  const knobY =
-    leverTop +
-    (leverBottom - leverTop) * 0.30;
-
-  const railGradient = ctx.createLinearGradient(
-    leverX - 9,
-    0,
-    leverX + 9,
-    0
-  );
-
-  railGradient.addColorStop(0, "#7F898D");
-  railGradient.addColorStop(.5, "#E3E7E7");
-  railGradient.addColorStop(1, "#828B91");
-
-  ctx.fillStyle = railGradient;
+  ctx.fillStyle = "#E8EDF2";
+  ctx.fillRect(bodyX + 1, footerY, bodyW - 2, footerH);
+  ctx.strokeStyle = "rgba(168,177,186,.82)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-
-  ctx.roundRect(
-    leverX - 8,
-    leverTop,
-    16,
-    leverBottom - leverTop,
-    8
-  );
-
-  ctx.fill();
-  ctx.strokeStyle = "rgba(252,252,252,.83)";
-  ctx.lineWidth = 1.5;
+  ctx.moveTo(bodyX + 1, footerY);
+  ctx.lineTo(bodyX + bodyW - 1, footerY);
   ctx.stroke();
 
-  const rodGradient = ctx.createLinearGradient(
-    leverX - 5,
-    0,
-    leverX + 5,
-    0
-  );
+  const leftButtonX = cx - CAMOU_VISUAL_VIEWER.navGap / 2;
+  const rightButtonX = cx + CAMOU_VISUAL_VIEWER.navGap / 2;
+  const buttonY = CAMOU_VISUAL_VIEWER.navY;
+  camouDrawViewerNavButton(ctx, leftButtonX, buttonY, CAMOU_VISUAL_VIEWER.navRadius, -1);
+  camouDrawViewerNavButton(ctx, rightButtonX, buttonY, CAMOU_VISUAL_VIEWER.navRadius, 1);
 
-  rodGradient.addColorStop(0, "#8A9498");
-  rodGradient.addColorStop(.45, "#F4F4F1");
-  rodGradient.addColorStop(1, "#B7BDC0");
-
-  ctx.strokeStyle = rodGradient;
-  ctx.lineWidth = 9;
-  ctx.lineCap = "round";
-
-  ctx.beginPath();
-  ctx.moveTo(leverX, knobY);
-  ctx.lineTo(leverX, knobY + 38);
-  ctx.stroke();
-
-  const knobGradient = ctx.createRadialGradient(
-    leverX - 8,
-    knobY - 8,
-    2,
-    leverX,
-    knobY,
-    23
-  );
-
-  knobGradient.addColorStop(0, "#FAFAF8");
-  knobGradient.addColorStop(.35, "#DADEDF");
-  knobGradient.addColorStop(.75, "#ADB5BA");
-  knobGradient.addColorStop(1, "#747F86");
-
-  ctx.fillStyle = knobGradient;
-  ctx.beginPath();
-  ctx.arc(leverX, knobY, 22, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(252,252,252,.90)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Dezente PRESS-Markierung.
-  ctx.save();
-
-  ctx.shadowColor = "rgba(226,228,227,.40)";
-  ctx.shadowBlur = 16;
-  ctx.strokeStyle = "#E8E9E8";
-  ctx.lineWidth = 2.5;
-
-  ctx.beginPath();
-  ctx.arc(leverX, knobY, 24, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.restore();
-  ctx.save();
-
-  ctx.font = "700 15px 'DM Mono', monospace";
+  ctx.fillStyle = "#5D6772";
+  ctx.font = "600 10.5px Segoe UI, Arial, sans-serif";
   ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#414A50";
+  ctx.fillText(`${String(visualIndex + 1)} / ${String(visualImages.length)}`, cx, buttonY + 34);
 
-  ctx.fillText(
-    "PRESS",
-    leverX,
-    knobY + 1,
-    38
-  );
+  ctx.textAlign = "left";
+  ctx.font = "400 10.5px Segoe UI, Arial, sans-serif";
+  ctx.fillStyle = "#59636F";
+  ctx.fillText(camouVisualSlideName(), photoX + 3, photoY - 7);
 
-  ctx.restore();
-
-  ctx.fillStyle = "rgba(252,252,252,.88)";
-  ctx.font = "bold 22px Arial";
-  ctx.textAlign = "center";
-
-  ctx.fillText(
-    "↓",
-    leverX,
-    leverBottom + 25
-  );
-
-  ctx.fillStyle = "#FCFCFC";
-  ctx.font = "bold 15px 'DM Mono', monospace";
   ctx.textAlign = "right";
-
-  ctx.fillText(
-    `${String(visualIndex + 1).padStart(2, "0")} / ${String(visualImages.length).padStart(2, "0")}`,
-    bodyX + bodyW - 25,
-    bodyY + bodyH - 15
-  );
+  ctx.fillStyle = "#7A8692";
+  ctx.fillText("Bildvorschau", bodyX + bodyW - 15, footerY + footerH / 2 + 3);
 
   ctx.restore();
 }
@@ -2696,24 +2501,30 @@ function camouEnsureVisualSlides() {
   return camouVisualSlideLoading;
 }
 
-function advanceVisualSlide() {
+function cycleVisualSlide(direction) {
   if (!visualImages.length) return;
 
+  const applyCycle = () => {
+    visualIndex = (
+      visualIndex + direction + visualImages.length
+    ) % visualImages.length;
+    refreshVisualsTexture();
+  };
+
   if (visualImages.some(image => !image)) {
-    camouEnsureVisualSlides().then(() => {
-      visualIndex =
-        (visualIndex + 1) % visualImages.length;
-
-      refreshVisualsTexture();
-    });
-
+    camouEnsureVisualSlides().then(applyCycle);
     return;
   }
 
-  visualIndex =
-    (visualIndex + 1) % visualImages.length;
+  applyCycle();
+}
 
-  refreshVisualsTexture();
+function advanceVisualSlide() {
+  cycleVisualSlide(1);
+}
+
+function previousVisualSlide() {
+  cycleVisualSlide(-1);
 }
 
 
@@ -3801,32 +3612,38 @@ function inImage(point, index) {
     Math.abs(q.y) <= PHOTO_H / 2;
 }
 
-function isOnVisualLever(point) {
+const CAMOU_VISUAL_VIEWER = Object.freeze({
+  bodyWidth: 526,
+  bodyHeight: 448,
+  bodyY: -236,
+  photoInsetX: 20,
+  photoInsetTop: 82,
+  photoInsetBottom: 76,
+  navY: 184,
+  navRadius: 24,
+  navGap: 68
+});
+
+function camouVisualNavDirectionAt(point) {
   const q = photoPoint(point, 2);
 
-  if (!q) return false;
+  if (!q) return 0;
 
-  const dx =
-    q.x / CONFIG.visualScale;
+  const x = q.x / CONFIG.visualScale;
+  const y = q.y / CONFIG.visualScale;
 
-  const y =
-    q.y / CONFIG.visualScale;
+  const buttons = [
+    { x: -CAMOU_VISUAL_VIEWER.navGap / 2, y: CAMOU_VISUAL_VIEWER.navY, dir: -1 },
+    { x:  CAMOU_VISUAL_VIEWER.navGap / 2, y: CAMOU_VISUAL_VIEWER.navY, dir:  1 }
+  ];
 
-  const leverX =
-    PHOTO_W / 2 + 43;
+  for (const button of buttons) {
+    if (Math.hypot(x - button.x, y - button.y) <= CAMOU_VISUAL_VIEWER.navRadius + 10) {
+      return button.dir;
+    }
+  }
 
-  const leverTop =
-    -PHOTO_H / 2 + 15;
-
-  const leverBottom =
-    -PHOTO_H / 2 +
-    PHOTO_H * 0.72;
-
-  return (
-    Math.abs(dx - leverX) < 38 &&
-    y >= leverTop - 28 &&
-    y <= leverBottom + 35
-  );
+  return 0;
 }
 
 function handleGlobeClick(event) {
@@ -3914,7 +3731,7 @@ function handleGlobeClick(event) {
 
     homeVideoStarting = true;
     // Der Loop wird NICHT mehr abrupt gestoppt: die play-Events
-    // blenden ihn bei erfolgreichem Videostart innerhalb von 3 s aus.
+    // blenden ihn bei erfolgreichem Videostart innerhalb von 2 s aus.
     homeVideo.play()
       .then(() => {
         homeVideoStarted = true;
@@ -4039,19 +3856,19 @@ stage.addEventListener(
 
     const point = texturePoint(event);
 
-    // Visuals Hebel.
-    if (
-  camouWorldMode !== "planet" &&
-  isOnVisualLever(point)
-) {
-      visualLeverPointer = event.pointerId;
-      visualLeverMoved = false;
-      visualLeverStartY = event.clientY;
+        // Visuals: Vor- / Zurueck-Buttons der Fotoanzeige.
+    if (camouWorldMode !== "planet") {
+      const navDirection = camouVisualNavDirectionAt(point);
+      if (navDirection) {
+        visualNavPointer = event.pointerId;
+        visualNavMoved = false;
+        visualNavStartX = event.clientX;
+        visualNavStartY = event.clientY;
+        visualNavDirection = navDirection;
 
-      stage.setPointerCapture(
-        event.pointerId
-      );
-      return;
+        stage.setPointerCapture(event.pointerId);
+        return;
+      }
     }
 
     pointers.set(event.pointerId, {
@@ -4115,19 +3932,15 @@ stage.addEventListener(
 stage.addEventListener(
   "pointermove",
   event => {
-    // Mechanischer Dia-Hebel.
-    if (
-      visualLeverPointer === event.pointerId
-    ) {
-      const pullDistance =
-        event.clientY - visualLeverStartY;
-
+        // Visuals: Klick-Buttons der Windows-Fotoanzeige.
+    if (visualNavPointer === event.pointerId) {
       if (
-        pullDistance > 35 &&
-        !visualLeverMoved
+        Math.hypot(
+          event.clientX - visualNavStartX,
+          event.clientY - visualNavStartY
+        ) > 12
       ) {
-        visualLeverMoved = true;
-        advanceVisualSlide();
+        visualNavMoved = true;
       }
 
       return;
@@ -4276,19 +4089,16 @@ velocityX = my / factor;
 ========================================= */
 
 function releasePointer(event) {
-  // Visuals Hebel.
-  if (
-    visualLeverPointer === event.pointerId
-  ) {
-    if (
-      event.type === "pointerup" &&
-      !visualLeverMoved
-    ) {
-      advanceVisualSlide();
+    // Visuals: Buttons der Fotoanzeige.
+  if (visualNavPointer === event.pointerId) {
+    if (event.type === "pointerup" && !visualNavMoved) {
+      if (visualNavDirection < 0) previousVisualSlide();
+      else advanceVisualSlide();
     }
 
-    visualLeverPointer = null;
-    visualLeverMoved = false;
+    visualNavPointer = null;
+    visualNavMoved = false;
+    visualNavDirection = 0;
     return;
   }
 
