@@ -1051,7 +1051,7 @@ homeVideo.src = ASSETS.homeVideo;
 homeVideo.loop = true;
 homeVideo.playsInline = true;
 homeVideo.preload = "none";
-homeVideo.volume = 0.65; // 35 % leiser als bisher (100 %)
+homeVideo.volume = 0.455; // V8: 30 % weniger als die bisherige Lautstaerke 0.65
 
 let homeVideoStarted = false;
 let homeVideoPlaying = false;
@@ -1064,28 +1064,89 @@ let lastVideoFallbackPaint = 0;
    camouloop.mp3 laeuft in Schleife. Das Zuhause-Video hat Vorrang.
 ========================================= */
 
+const CAMOU_AMBIENT_BASE_VOLUME = 0.30;
+const CAMOU_AMBIENT_FADE_MS = 3000;
+
 const camouAmbientAudio = new Audio(ASSETS.ambientLoop);
 camouAmbientAudio.loop = true;
 camouAmbientAudio.preload = "auto";
-camouAmbientAudio.volume = 0.48;
+camouAmbientAudio.volume = CAMOU_AMBIENT_BASE_VOLUME;
 
 let camouAmbientGestureSeen = false;
+let camouAmbientFadeFrame = null;
+let camouAmbientFadeActive = false;
+let camouAmbientFadeGeneration = 0;
+
+function camouCancelAmbientFade() {
+  // Beim schnellen Umschalten zwischen Video und Loop keine alten
+  // Animationen weiterlaufen lassen, die den Pegel spaeter veraendern.
+  camouAmbientFadeGeneration += 1;
+  camouAmbientFadeActive = false;
+  if (camouAmbientFadeFrame !== null) {
+    cancelAnimationFrame(camouAmbientFadeFrame);
+    camouAmbientFadeFrame = null;
+  }
+}
 
 function camouPauseAmbientLoop() {
-  // pause() behaelt currentTime; nach dem Video geht es exakt dort weiter.
+  // Harte Pause nur beim Tab-Wechsel; nicht beim Videostart.
+  // Die Wiedergabeposition des MP3-Loops bleibt erhalten.
+  camouCancelAmbientFade();
   if (!camouAmbientAudio.paused) camouAmbientAudio.pause();
+  camouAmbientAudio.volume = CAMOU_AMBIENT_BASE_VOLUME;
+}
+
+function camouFadeAmbientForVideo() {
+  // Start erst bei tatsaechlich laufendem Video. Der vorhandene Loop
+  // wird in DREI Sekunden stufenlos ausgeblendet und dann pausiert.
+  if (camouAmbientFadeActive || camouAmbientAudio.paused ||
+      homeVideo.paused || document.hidden) return;
+
+  camouCancelAmbientFade();
+  camouAmbientFadeActive = true;
+  const generation = camouAmbientFadeGeneration;
+  const startedAt = performance.now();
+  const initialVolume = camouAmbientAudio.volume;
+
+  const tick = now => {
+    if (generation !== camouAmbientFadeGeneration) return;
+    if (homeVideo.paused || document.hidden) {
+      camouCancelAmbientFade();
+      if (document.hidden) camouPauseAmbientLoop();
+      else camouPlayAmbientIfPossible();
+      return;
+    }
+
+    const t = clamp((now - startedAt) / CAMOU_AMBIENT_FADE_MS, 0, 1);
+    // Weiche S-Kurve statt linearer, hoerbar harter Pegelbewegung.
+    camouAmbientAudio.volume = clamp(
+      initialVolume * (1 - smooth(t)), 0, CAMOU_AMBIENT_BASE_VOLUME
+    );
+
+    if (t < 1) {
+      camouAmbientFadeFrame = requestAnimationFrame(tick);
+    } else {
+      camouAmbientFadeFrame = null;
+      camouAmbientFadeActive = false;
+      camouAmbientAudio.pause();
+      camouAmbientAudio.volume = CAMOU_AMBIENT_BASE_VOLUME;
+    }
+  };
+
+  camouAmbientFadeFrame = requestAnimationFrame(tick);
 }
 
 function camouPlayAmbientIfPossible() {
-  // Keine sich ueberlagernden Tonspuren, auch nicht waehrend video.play() laedt.
+  // Sobald das Video pausiert wird, sofort mit normalem Pegel weiter.
   if (homeVideoStarting || !homeVideo.paused || document.hidden) return;
+  camouCancelAmbientFade();
+  camouAmbientAudio.volume = CAMOU_AMBIENT_BASE_VOLUME;
   if (!camouAmbientAudio.paused) return;
 
   try {
     const attempt = camouAmbientAudio.play();
     if (attempt && typeof attempt.catch === "function") {
-      // Ohne Nutzerinteraktion sperren Browser meist die automatische Wiedergabe.
-      // Die naechste echte Interaktion versucht es erneut.
+      // Automatische Wiedergabe ist ohne Browser-Freigabe oft untersagt.
       attempt.catch(error => {
         if (error?.name !== "NotAllowedError" &&
             error?.name !== "AbortError") {
@@ -1103,8 +1164,7 @@ function camouStartAmbientAfterInteraction() {
   camouPlayAmbientIfPossible();
 }
 
-// Kein zusaetzlicher Button: Musik beginnt bei der ersten erlaubten Interaktion.
-// pointerup (statt pointerdown), damit der Video-Klick bereits erkannt ist.
+// Der Loop beginnt beim ersten vom Browser zugelassenen Nutzerkontakt.
 document.addEventListener("pointerup", camouStartAmbientAfterInteraction, {
   passive: true
 });
@@ -1114,23 +1174,22 @@ document.addEventListener("keydown", event => {
   }
 });
 
-// Der Videostatus ist zusaetzlich direkt an das Audio gekoppelt.
-homeVideo.addEventListener("play", camouPauseAmbientLoop);
-homeVideo.addEventListener("playing", camouPauseAmbientLoop);
+// Erst bei tatsaechlicher Videowiedergabe ausblenden, nicht beim Puffern.
+homeVideo.addEventListener("playing", camouFadeAmbientForVideo);
 homeVideo.addEventListener("pause", () => {
-  if (camouAmbientGestureSeen) camouPlayAmbientIfPossible();
+  // Auch nach vollstaendigem Fade-out den zuvor pausierten Loop fortsetzen.
+  camouPlayAmbientIfPossible();
 });
 homeVideo.addEventListener("ended", () => {
-  if (camouAmbientGestureSeen) camouPlayAmbientIfPossible();
+  camouPlayAmbientIfPossible();
 });
 
-// In Hintergrund-Tabs keinen Sound abspielen. Bei Rueckkehr fortsetzen.
+// In Hintergrund-Tabs pausieren; beim Zurueckwechsel nur ohne Video starten.
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) camouPauseAmbientLoop();
   else if (camouAmbientGestureSeen) camouPlayAmbientIfPossible();
 });
 
-// Browser mit freigegebenem Autoplay starten sofort; alle anderen per Geste.
 camouPlayAmbientIfPossible();
 
 function startHomeVideoFrameUpdates() {
@@ -2140,34 +2199,84 @@ function camouCRTScreenPath(ctx, x, y, w, h) {
   ctx.closePath();
 }
 
-// Render thin horizontal slices with mild barrel distortion: edges taper
-// slightly, while the centre fills the CRT screen. All slides use the same
-// transform, and the glass path clips every slice to the oval screen.
+// Die Bildflaeche hat eine ECHTE 2D-Roehrenkruemmung, nicht bloss
+// einen ovalen Ausschnitt oder horizontal zusammengedrueckte Streifen.
+// Radiale Tonnenverzeichnung biegt senkrechte UND waagrechte Bildlinien.
+// Jedes Standbild wird genau einmal verzerrt und danach gecacht.
+const camouCRTImageCache = new WeakMap();
+
 function camouCRTDrawWarpedImage(ctx, image, x, y, w, h) {
   const iw = image?.videoWidth || image?.naturalWidth || image?.width;
   const ih = image?.videoHeight || image?.naturalHeight || image?.height;
   if (!iw || !ih) return;
 
-  const scale = Math.max(w / iw, h / ih);
-  const cropW = Math.min(iw, w / scale);
-  const cropH = Math.min(ih, h / scale);
-  const cropX = (iw - cropW) * .5;
-  const cropY = (ih - cropH) * .5;
+  try {
+    let curved = camouCRTImageCache.get(image);
+    if (!curved || curved.camouWidth !== w || curved.camouHeight !== h) {
+      const pixelsW = Math.max(96, Math.round(w * 1.45));
+      const pixelsH = Math.max(72, Math.round(h * 1.45));
 
-  const slices = Math.ceil(h / 2.5);
-  for (let i = 0; i < slices; i++) {
-    const start = i / slices;
-    const end = (i + 1) / slices;
-    const mid = (start + end) * .5;
-    const towardEnds = Math.abs(mid * 2 - 1);
-    const squeezedW = w * (1 - .085 * towardEnds * towardEnds);
-    const destX = x + (w - squeezedW) * .5;
-    const destY = y + h * start;
-    const destH = h * (end - start) + .65; // overlapping rows, no black seams
-    const srcY = cropY + cropH * start;
-    const srcH = Math.min(ih - srcY, cropH * (end - start) + .35);
-    ctx.drawImage(image, cropX, srcY, cropW, srcH,
-      destX, destY, squeezedW, destH);
+      const sourceCanvas = document.createElement("canvas");
+      sourceCanvas.width = pixelsW;
+      sourceCanvas.height = pixelsH;
+      const sourceCtx = sourceCanvas.getContext("2d", { willReadFrequently: true });
+      // Mittiger Beschnitt wie zuvor, ohne Bildproportionen zu strecken.
+      cover(sourceCtx, image, 0, 0, pixelsW, pixelsH);
+      const input = sourceCtx.getImageData(0, 0, pixelsW, pixelsH).data;
+
+      curved = document.createElement("canvas");
+      curved.width = pixelsW;
+      curved.height = pixelsH;
+      curved.camouWidth = w;
+      curved.camouHeight = h;
+      const outputCtx = curved.getContext("2d");
+      const output = outputCtx.createImageData(pixelsW, pixelsH);
+      const result = output.data;
+
+      for (let py = 0; py < pixelsH; py++) {
+        const ny = (2 * (py + .5) / pixelsH) - 1;
+        for (let px = 0; px < pixelsW; px++) {
+          const nx = (2 * (px + .5) / pixelsW) - 1;
+          const r2 = nx * nx + ny * ny;
+          // Kruemmung einer gewoelbten Bildroehre: Inverse der radialen
+          // Projektion, sanft asymmetrisch wie bei echtem altem Glas.
+          const organic = .006 * Math.sin(nx * 2.6 + ny * 3.4) * r2;
+          const projection = 1 + .205 * r2 + organic;
+          const sx = clamp((nx / projection + 1) * .5 * (pixelsW - 1), 0, pixelsW - 1);
+          const sy = clamp((ny / projection + 1) * .5 * (pixelsH - 1), 0, pixelsH - 1);
+          const x0 = Math.floor(sx);
+          const y0 = Math.floor(sy);
+          const x1 = Math.min(x0 + 1, pixelsW - 1);
+          const y1 = Math.min(y0 + 1, pixelsH - 1);
+          const fx = sx - x0;
+          const fy = sy - y0;
+          const i00 = (y0 * pixelsW + x0) * 4;
+          const i10 = (y0 * pixelsW + x1) * 4;
+          const i01 = (y1 * pixelsW + x0) * 4;
+          const i11 = (y1 * pixelsW + x1) * 4;
+          const dest = (py * pixelsW + px) * 4;
+
+          // Bilineare Filterung statt pixeliger Kacheln / Streifenkanten.
+          for (let channel = 0; channel < 4; channel++) {
+            const a = input[i00 + channel] * (1 - fx) + input[i10 + channel] * fx;
+            const b = input[i01 + channel] * (1 - fx) + input[i11 + channel] * fx;
+            result[dest + channel] = a * (1 - fy) + b * fy;
+          }
+        }
+      }
+
+      outputCtx.putImageData(output, 0, 0);
+      camouCRTImageCache.set(image, curved);
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(curved, x, y, w, h);
+  } catch (error) {
+    // Falls ein Browser Pixelzugriff verweigert, den gut lesbaren,
+    // unverzerrten Bildplayer beibehalten statt schwarze Balken zu zeigen.
+    console.warn("CAMOU: CRT-Bildwoelbung nicht verfuegbar", error);
+    cover(ctx, image, x, y, w, h);
   }
 }
 
@@ -2384,6 +2493,45 @@ function drawVisualViewer(ctx, cx, iy, iw, ih) {
     windowW,
     windowH
   );
+
+  // Gewoelbtes Glas schattet die Bildraender weich ab; die Mitte
+  // bleibt sichtbar hell. Alles bleibt in der CRT-Maske geclippt.
+  const glassDepth = ctx.createRadialGradient(
+    windowX + windowW * .43,
+    windowY + windowH * .38,
+    windowH * .09,
+    windowX + windowW * .50,
+    windowY + windowH * .52,
+    windowW * .66
+  );
+  glassDepth.addColorStop(0, "rgba(245,248,248,.06)");
+  glassDepth.addColorStop(.55, "rgba(255,255,255,0)");
+  glassDepth.addColorStop(.79, "rgba(28,34,38,.055)");
+  glassDepth.addColorStop(1, "rgba(15,22,26,.39)");
+  ctx.fillStyle = glassDepth;
+  ctx.fillRect(windowX, windowY, windowW, windowH);
+
+  // Winzige analoge Scanlines, keine auffaellige Digital-Textur.
+  ctx.strokeStyle = "rgba(20,29,34,.032)";
+  ctx.lineWidth = .55;
+  ctx.beginPath();
+  for (let yy = windowY + 2; yy < windowY + windowH; yy += 4.5) {
+    ctx.moveTo(windowX, yy);
+    ctx.lineTo(windowX + windowW, yy);
+  }
+  ctx.stroke();
+
+  // Unregelmaessiger Lichtreflex auf der KONVEXEN Glasoberflaeche.
+  ctx.beginPath();
+  ctx.moveTo(windowX + windowW * .12, windowY + windowH * .17);
+  ctx.bezierCurveTo(
+    windowX + windowW * .34, windowY - windowH * .015,
+    windowX + windowW * .61, windowY + windowH * .01,
+    windowX + windowW * .77, windowY + windowH * .12
+  );
+  ctx.strokeStyle = "rgba(250,251,251,.13)";
+  ctx.lineWidth = 2.3;
+  ctx.stroke();
 
   ctx.restore();
 
@@ -3765,13 +3913,15 @@ function handleGlobeClick(event) {
     }
 
     homeVideoStarting = true;
-    camouPauseAmbientLoop();
-
+    // Der Loop wird NICHT mehr abrupt gestoppt: die play-Events
+    // blenden ihn bei erfolgreichem Videostart innerhalb von 3 s aus.
     homeVideo.play()
       .then(() => {
         homeVideoStarted = true;
         homeVideoPlaying = true;
         homeVideoStarting = false;
+        // Fallback fuer Browser, die "playing" erst verzoegert melden.
+        camouFadeAmbientForVideo();
 
         updateHomeVideoFrame();
         startHomeVideoFrameUpdates();
@@ -5817,8 +5967,8 @@ function camouCreateRockyWorldTexture() {
 
   ctx.putImageData(image, 0, 0);
 
-  // Die vier Saetze sitzen direkt auf der kugelfoermigen Textur.
-  // Man entdeckt sie an unterschiedlichen Stellen beim Drehen des Planeten.
+  // Genau acht einzelne Woerter/Symbole, jedes einmal: ueber die
+  // gesamte Kugel verteilt und beim Drehen nach und nach sichtbar.
   camouDrawSecondPlanetScatteredText(ctx, width, height);
 
   const texture = new THREE.CanvasTexture(
@@ -5843,54 +5993,39 @@ function camouCreateRockyWorldTexture() {
 ========================================= */
 
 function camouDrawSecondPlanetScatteredText(ctx, width, height) {
-  // Only this one phrase is used; no older four text fragments remain.
-  // The coordinates and small jitter form a repeatable, irregular pattern.
-  const phrase = "mal sehen wo der wind mich hinweht >.<";
-  const places = [
-    { u: .09, v: .20, angle: -.09 },
-    { u: .42, v: .12, angle:  .07 },
-    { u: .76, v: .26, angle: -.10 },
-    { u: .24, v: .42, angle:  .12 },
-    { u: .60, v: .49, angle: -.05 },
-    { u: .94, v: .53, angle:  .08 },
-    { u: .10, v: .73, angle: -.09 },
-    { u: .45, v: .82, angle:  .05 },
-    { u: .79, v: .78, angle: -.07 }
+  // JEDES Wort genau einmal. Keine wiederholten Saetze, keine Duplikate.
+  // Verschiedene Laengen-/Breitengrade verteilen die Woerter um die Kugel.
+  // Die festen, unregelmaessigen Werte verhindern Ueberlappungen beim Laden.
+  const words = [
+    { text: "mal",     u: .12, v: .22, angle: -.17 },
+    { text: "sehen",   u: .42, v: .67, angle:  .08 },
+    { text: "wo",      u: .75, v: .33, angle: -.08 },
+    { text: "der",     u: .26, v: .51, angle:  .12 },
+    { text: "wind",    u: .56, v: .16, angle: -.06 },
+    { text: "mich",    u: .88, v: .71, angle:  .11 },
+    { text: "hinweht", u: .57, v: .87, angle: -.07 },
+    { text: ">.<",     u: .09, v: .81, angle:  .05 }
   ];
-
-  let seed = 0xC42027;
-  const jitter = () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296 - .5;
-  };
 
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
-  const fontSize = width * .0091;  // 14 px at 1536: intentionally tiny
+  const fontSize = Math.max(11, width * .0105);
   ctx.font = `500 ${fontSize}px Manrope, Arial, sans-serif`;
-  const textWidth = width * .19;
 
-  for (const place of places) {
-    const x = (place.u + jitter() * .022) * width;
-    const y = (place.v + jitter() * .024) * height;
-    const angle = place.angle + jitter() * .05;
-
-    // Horizontal seam repetition ensures continuous text as the sphere rotates.
-    for (const offset of [-width, 0, width]) {
-      ctx.save();
-      ctx.translate(x + offset, y);
-      ctx.rotate(angle);
-      ctx.fillStyle = "rgba(252,252,252,.92)";
-      ctx.strokeStyle = "rgba(63,39,51,.38)";
-      ctx.lineWidth = Math.max(.45, width * .00034);
-      ctx.shadowColor = "rgba(53,34,45,.18)";
-      ctx.shadowBlur = Math.max(.8, width * .00095);
-      ctx.strokeText(phrase, 0, 0, textWidth);
-      ctx.fillText(phrase, 0, 0, textWidth);
-      ctx.restore();
-    }
+  for (const word of words) {
+    ctx.save();
+    ctx.translate(word.u * width, word.v * height);
+    ctx.rotate(word.angle);
+    ctx.fillStyle = "rgba(252,252,252,.94)";
+    ctx.strokeStyle = "rgba(63,39,51,.35)";
+    ctx.lineWidth = Math.max(.4, width * .0003);
+    ctx.shadowColor = "rgba(53,34,45,.22)";
+    ctx.shadowBlur = Math.max(.8, width * .001);
+    ctx.strokeText(word.text, 0, 0);
+    ctx.fillText(word.text, 0, 0);
+    ctx.restore();
   }
 
   ctx.restore();
