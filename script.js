@@ -43,14 +43,14 @@ const ASSETS = {
 
 const sections = [
   {
-    name: "HOME",
+    name: "zuhause",
     eyebrow: "01 — NEW PROJECT",
     title: ["c a m O u"],
     body: ["Gleiche Fragen.", "Neuer Cosmos."],
     image: ASSETS.home
   },
   {
-    name: "MUSIC",
+    name: "musik",
     eyebrow: "02 — RELEASES",
     title: ["f r a g m e n t e"],
     body: [
@@ -62,9 +62,9 @@ const sections = [
     image: ASSETS.music
   },
   {
-    name: "VISUALS",
+    name: "??",
     eyebrow: "03 — VISUAL WORKS",
-    title: ["Visuals"],
+    title: ["??"],
     body: [
       "Bilder, die bleiben.",
       "Momente, die verschwinden."
@@ -72,9 +72,9 @@ const sections = [
     image: ASSETS.visuals
   },
   {
-    name: "ECHOES",
+    name: "echo",
     eyebrow: "04 — HALL",
-    title: ["Echoes"],
+    title: ["echo"],
     body: [
       "Songs und Spuren, die an",
       "verschiedenen Orten widerhallen.",
@@ -83,9 +83,9 @@ const sections = [
     image: ASSETS.archive
   },
   {
-    name: "CONTACT",
+    name: "kontakt",
     eyebrow: "05 — GET IN TOUCH",
-    title: ["Contact"],
+    title: ["kontakt"],
     body: [
       "Für Anfragen und Zusammenarbeit.",
       "oder einfach so"
@@ -125,6 +125,49 @@ const stage = document.querySelector(".globe-stage");
 const navButtons = [
   ...document.querySelectorAll(".nav-link")
 ];
+
+// Sichtbare Namen im HTML-Menue aktualisieren, ohne dessen Elemente,
+// Formatierung oder die bestehenden data-section-Klickziele auszutauschen.
+const CAMOU_MENU_LABELS = ["zuhause", "musik", "??", "echo", "kontakt"];
+const CAMOU_OLD_MENU_LABELS = ["HOME", "MUSIC", "VISUALS", "ECHOES", "CONTACT"];
+
+function camouRenameNavigation() {
+  navButtons.forEach((button, position) => {
+    const sectionIndex = Number(button.dataset.section);
+    const index = Number.isInteger(sectionIndex) &&
+      sectionIndex >= 0 && sectionIndex < CAMOU_MENU_LABELS.length
+      ? sectionIndex : position;
+    const newName = CAMOU_MENU_LABELS[index];
+    if (!newName) return;
+
+    // Nur den Beschriftungstext ersetzen. Verschachtelte Markup-Elemente
+    // (z. B. Unterstreichungen) und Event-Listener bleiben unangetastet.
+    const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+    let labelNode = null;
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const value = node.nodeValue.trim();
+      if (value === CAMOU_OLD_MENU_LABELS[index] || value === newName) {
+        labelNode = node;
+        break;
+      }
+    }
+
+    if (labelNode) {
+      const raw = labelNode.nodeValue;
+      const leading = raw.match(/^\s*/)?.[0] || "";
+      const trailing = raw.match(/\s*$/)?.[0] || "";
+      labelNode.nodeValue = leading + newName + trailing;
+    } else {
+      const label = button.querySelector("[data-nav-label], .nav-label, .nav-link-text");
+      if (label) label.textContent = newName;
+      else button.textContent = newName;
+    }
+    button.setAttribute("aria-label", newName);
+  });
+}
+
+camouRenameNavigation();
 
 /* =========================================
    MENUE-OVERLAYS / MITTIGE NAVIGATION
@@ -5410,7 +5453,8 @@ function camouCreatePortal() {
   c.shadowBlur = 14;
   c.fillStyle = "#FCFCFC";
 
-  c.fillText("BEAM ME UP  ↗", 0, 0);
+  const camouPortalLabel = "dings  ↗";
+  c.fillText(camouPortalLabel, 0, 0);
 
   c.shadowBlur = 0;
 
@@ -5418,8 +5462,9 @@ function camouCreatePortal() {
   c.lineWidth = 1;
 
   c.beginPath();
-  c.moveTo(-118, 27);
-  c.lineTo(118, 27);
+  const portalUnderlineHalfWidth = c.measureText(camouPortalLabel).width / 2;
+  c.moveTo(-portalUnderlineHalfWidth, 27);
+  c.lineTo(portalUnderlineHalfWidth, 27);
   c.stroke();
 
   const texture = new THREE.CanvasTexture(canvas);
